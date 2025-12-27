@@ -284,12 +284,12 @@ class GeminiClient:
         self,
         prompt: str,
         style_description: Optional[str] = None,
-        base_image: Optional[Union[Path, bytes, Image.Image]] = None,
+        base_image: Optional[Union[Path, Image.Image]] = None,
         aspect_ratio: str = "16:9",
         image_size: str = "4K",
         model: Optional[str] = None,
         save_path: Optional[Path] = None
-    ) -> bytes:
+    ) -> Image.Image:
         """
         Generate image using Gemini's image generation model.
         
@@ -306,11 +306,11 @@ class GeminiClient:
             base_image: Base image for IMAGE EDITING (passed as content)
             aspect_ratio: Image aspect ratio (16:9, 4:3, 1:1, 9:16, etc.)
             image_size: Image size (4K, 1080p, 720p)
-            model: Model name (overrides default)
+            model: Model name (overrides default from config)
             save_path: Optional path to save generated image
         
         Returns:
-            Generated image bytes (PNG format)
+            Generated PIL Image
         
         Raises:
             Exception: If generation fails
@@ -339,58 +339,85 @@ class GeminiClient:
         """
         logger.info(f"Generating image with prompt: {prompt[:100]}...")
         
+        # Use model from config, not hardcoded
+        model_name = model or self.model_image
+        
         try:
             # Enhance prompt with style description for consistency
             enhanced_prompt = prompt
             if style_description:
                 logger.debug("Enhancing prompt with style description for consistency")
-                enhanced_prompt = f"""{prompt}
-
-**Style Requirements for Visual Consistency:**
-{style_description}
-
-Ensure this slide maintains the same visual style, color scheme, and design language as described above."""
+                # Load style consistency template from file
+                style_template = self._load_prompt_template("style_consistency")
+                style_text = style_template.format(style_description=style_description)
+                enhanced_prompt = f"{prompt}\n\n{style_text}"
             
-            # Note: base_image parameter is currently not used
-            # Imagen API for simple text-to-image doesn't support reference images directly
-            # Style consistency is achieved through enhanced prompts
-            
-            # Generate image using the correct API (generate_images, not generate_content)
-            response = self.client.models.generate_images(
-                model="imagen-3.0-generate-002",  # Use Imagen model for image generation
-                prompt=enhanced_prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
+            # Generate image with or without base image
+            if base_image is not None:
+                # Mode 2: Image-to-Image (editing)
+                if isinstance(base_image, Path):
+                    base_image = Image.open(base_image)
+                logger.debug("Image-to-Image mode: editing base image")
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=[enhanced_prompt, base_image],
                 )
-            )
+            else:
+                # Mode 1: Text-to-Image (generation)
+                logger.debug("Text-to-Image mode: generating from prompt")
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=enhanced_prompt,
+                )
             
             # Extract image from response
-            if not response.generated_images or len(response.generated_images) == 0:
-                raise Exception("No images generated in response")
+            output_image = None
+            for part in response.parts:
+                if part.text is not None:
+                    logger.debug(f"Response text: {part.text[:100]}...")
+                elif part.inline_data is not None:
+                    output_image = part.as_image()
+                    break
             
-            # Get the first generated image
-            generated_image = response.generated_images[0]
-            image = generated_image.image  # This is a PIL Image
+            if output_image is None:
+                raise Exception("No image generated in response")
             
-            # Convert to bytes
-            buffer = BytesIO()
-            image.save(buffer, format='PNG')
-            image_bytes = buffer.getvalue()
-            
-            logger.info(f"Generated image: {len(image_bytes)} bytes")
+            logger.info(f"Generated image: {output_image.size}")
             
             # Save if path provided
             if save_path:
                 save_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(save_path, 'wb') as f:
-                    f.write(image_bytes)
+                output_image.save(save_path)
                 logger.info(f"Saved image to {save_path}")
             
-            return image_bytes
+            return output_image
             
         except Exception as e:
             logger.error(f"Image generation failed: {e}")
             raise
+    
+    def _load_prompt_template(self, template_name: str) -> str:
+        """
+        Load prompt template from file.
+        
+        Args:
+            template_name: Name of template file (without .txt extension)
+        
+        Returns:
+            Template content
+        """
+        template_file = Path("src/llm/prompts") / f"{template_name}.txt"
+        try:
+            return template_file.read_text()
+        except FileNotFoundError:
+            logger.warning(f"Template {template_file} not found, using default")
+            # Return default for style consistency
+            if template_name == "style_consistency":
+                return """**Style Requirements for Visual Consistency:**
+{style_description}
+
+Ensure this slide maintains the same visual style, color scheme, and design language as described above."""
+            return ""
     
     def extract_style_from_image(
         self,

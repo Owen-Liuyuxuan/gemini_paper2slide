@@ -56,14 +56,19 @@ class ImageGenerator:
         # Build prompt for title slide
         prompt = self._build_title_prompt(paper_info)
         
-        # Generate the image
+        # Generate the image (now returns PIL Image)
         start_time = time.time()
-        image_bytes = self.gemini_client.generate_image(
+        image = self.gemini_client.generate_image(
             prompt=prompt,
             aspect_ratio="16:9",
             image_size="4K"
         )
         generation_time = time.time() - start_time
+        
+        # Convert PIL Image to bytes
+        buffer = BytesIO()
+        image.save(buffer, format='PNG')
+        image_bytes = buffer.getvalue()
         
         # Create slide content
         slide_content = SlideContent(
@@ -139,15 +144,20 @@ Generate a professional academic presentation slide with the following content:
         if pdf_images:
             base_prompt += f"\n**Relevant Figures**: Consider incorporating elements from {len(pdf_images)} related figures from the paper"
         
-        # Generate with style consistency
+        # Generate with style consistency (returns PIL Image)
         start_time = time.time()
-        image_bytes = self.gemini_client.generate_image(
+        image = self.gemini_client.generate_image(
             prompt=base_prompt,
             style_description=self.style_description,  # Use extracted style
             aspect_ratio="16:9",
             image_size="4K"
         )
         generation_time = time.time() - start_time
+        
+        # Convert PIL Image to bytes
+        buffer = BytesIO()
+        image.save(buffer, format='PNG')
+        image_bytes = buffer.getvalue()
         
         # Create generated slide
         slide = GeneratedSlide(

@@ -1,0 +1,4 @@
+**Style Requirements for Visual Consistency:**
+{style_description}
+
+Ensure this slide maintains the same visual style, color scheme, and design language as described above.
