@@ -48,7 +48,7 @@ class PresentationPlanner:
         self, 
         paper_analysis: PaperAnalysis, 
         pdf_metadata: PDFMetadata, 
-        pdf_images: List[ExtractedImage],
+        pdf_images: List[ExtractedImage] = None,
         image_descriptions: Dict[int, str] = None
     ) -> PresentationPlan:
         """
@@ -59,13 +59,17 @@ class PresentationPlanner:
         Args:
             paper_analysis: Analysis of the paper
             pdf_metadata: Metadata extracted from PDF
-            pdf_images: List of images extracted from PDF
-            image_descriptions: Optional descriptions of extracted images
+            pdf_images: Optional list of images extracted from PDF (can be None/empty)
+            image_descriptions: Optional descriptions (from extraction or Gemini analysis)
         
         Returns:
             PresentationPlan object with complete presentation structure
         """
         logger.info("Creating presentation plan using structured output")
+        
+        # Ensure pdf_images is a list
+        if pdf_images is None:
+            pdf_images = []
         
         # Build comprehensive prompt for presentation planning
         prompt = self._build_presentation_plan_prompt(
@@ -134,11 +138,20 @@ class PresentationPlanner:
         ])
         
         # Format available figures
-        figures_text = f"{len(pdf_images)} figures extracted"
-        if image_descriptions:
-            figures_text += "\nSome important figures:\n"
-            for idx, desc in list(image_descriptions.items())[:5]:
-                figures_text += f"  - Page {pdf_images[idx].page_num}: {desc[:150]}...\n"
+        if pdf_images and len(pdf_images) > 0:
+            figures_text = f"{len(pdf_images)} figures extracted"
+            if image_descriptions:
+                figures_text += "\nSome important figures:\n"
+                for idx, desc in list(image_descriptions.items())[:5]:
+                    if idx < len(pdf_images):
+                        figures_text += f"  - Page {pdf_images[idx].page_num}: {desc[:150]}...\n"
+        elif image_descriptions:
+            # Gemini figure analysis (no extraction)
+            figures_text = f"{len(image_descriptions)} figures analyzed by Gemini\n"
+            for page, desc in list(image_descriptions.items())[:5]:
+                figures_text += f"  - Page {page}: {desc[:150]}...\n"
+        else:
+            figures_text = "No figure information available"
         
         prompt = f"""
 Create a comprehensive presentation plan for the following academic paper:

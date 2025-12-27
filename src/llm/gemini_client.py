@@ -640,8 +640,8 @@ Focus on objective visual characteristics rather than content.
             # Build content - can include PDF if provided
             if pdf_path:
                 logger.debug(f"Including PDF in structured output: {pdf_path}")
-                # Upload PDF file first
-                file_ref = self.client.files.upload(path=str(pdf_path))
+                # Upload PDF file - accepts path string or file object
+                file_ref = self.client.files.upload(file=str(pdf_path))
                 content = [file_ref, prompt]
             else:
                 content = prompt
