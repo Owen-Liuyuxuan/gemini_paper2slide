@@ -1,12 +1,16 @@
 """
-Image generation orchestrator with reference image workflow for style consistency.
+Image generation orchestrator with style consistency workflow.
 
 Generates presentation slides using Gemini's image generation capabilities,
-maintaining visual consistency through reference images.
+maintaining visual consistency through style descriptions extracted from reference slides.
 """
 
+import time
+from io import BytesIO
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+from PIL import Image
 
 from src.llm.gemini_client import GeminiClient
 from src.utils.logger import get_logger
@@ -19,8 +23,8 @@ class ImageGenerator:
     """
     Generate presentation slides with visual consistency.
     
-    Uses reference images to maintain style consistency across slides,
-    starting with the title slide as the first reference.
+    Uses style descriptions extracted from initial slides to maintain
+    consistency across the entire presentation.
     """
     
     def __init__(self, gemini_client: GeminiClient):
@@ -33,12 +37,13 @@ class ImageGenerator:
         self.gemini_client = gemini_client
         self.logger = logger
         self.reference_slides = []
+        self.style_description = None
         
-        logger.info("ImageGenerator initialized")
+        logger.info("ImageGenerator initialized with style consistency support")
     
     def generate_title_slide(self, paper_info: Dict) -> GeneratedSlide:
         """
-        Generate title slide - becomes first reference for style consistency.
+        Generate title slide - becomes the style reference for consistency.
         
         Args:
             paper_info: Dictionary containing paper title, authors, theme, etc.
@@ -46,19 +51,19 @@ class ImageGenerator:
         Returns:
             GeneratedSlide object for the title slide
         """
-        logger.info("Generating title slide")
+        logger.info("Generating title slide (will be used for style extraction)")
         
         # Build prompt for title slide
         prompt = self._build_title_prompt(paper_info)
         
         # Generate the image
-        start_time = __import__('time').time()
+        start_time = time.time()
         image_bytes = self.gemini_client.generate_image(
             prompt=prompt,
             aspect_ratio="16:9",
             image_size="4K"
         )
-        generation_time = __import__('time').time() - start_time
+        generation_time = time.time() - start_time
         
         # Create slide content
         slide_content = SlideContent(
@@ -81,83 +86,25 @@ class ImageGenerator:
             content=slide_content
         )
         
-        # Add to reference slides for consistency
+        # Add to reference slides and extract style
         self.reference_slides.append(slide)
+        self._extract_and_store_style(image_bytes)
         
-        logger.info("Title slide generated successfully")
-        return slide
-    
-    def generate_reference_slide(self, content: str, title_slide: GeneratedSlide) -> GeneratedSlide:
-        """
-        Generate second slide using title slide as reference for consistency.
-        
-        Args:
-            content: Content for the slide
-            title_slide: Previously generated title slide to use as reference
-        
-        Returns:
-            GeneratedSlide object for the reference slide
-        """
-        logger.info("Generating reference slide with title slide as reference")
-        
-        # Build prompt for content slide
-        prompt = f"""
-        Create a professional academic presentation slide with the following content:
-        {content}
-        
-        Style: Clean, professional, suitable for academic presentation
-        Visual Theme: Consistent with the research topic
-        """
-        
-        # Generate using title slide as reference
-        start_time = __import__('time').time()
-        image_bytes = self.gemini_client.generate_image(
-            prompt=prompt,
-            reference_images=[title_slide.image],
-            aspect_ratio="16:9",
-            image_size="4K"
-        )
-        generation_time = __import__('time').time() - start_time
-        
-        # Create slide content
-        slide_content = SlideContent(
-            index=1,
-            type="content",
-            title="Reference Slide",
-            main_points=[content],
-            visual_elements="Content slide maintaining consistency with title slide",
-            related_pdf_images=[],
-            notes="Reference slide for maintaining visual consistency"
-        )
-        
-        # Create generated slide
-        slide = GeneratedSlide(
-            index=1,
-            type="content",
-            image=image_bytes,
-            prompt=prompt,
-            generation_time=generation_time,
-            content=slide_content
-        )
-        
-        # Add to reference slides for consistency
-        self.reference_slides.append(slide)
-        
-        logger.info("Reference slide generated successfully")
+        logger.info("Title slide generated successfully with style extracted")
         return slide
     
     def generate_content_slide(
         self, 
         content: SlideContent, 
-        references: List[GeneratedSlide], 
+        references: Optional[List[GeneratedSlide]] = None,
         pdf_images: List[str] = None
     ) -> GeneratedSlide:
         """
-        Generate content slide using reference images for consistency.
+        Generate content slide using style description for consistency.
         
         Args:
             content: SlideContent object with title, points, etc.
-            references: List of previously generated slides to use as references
+            references: Optional list of reference slides (unused, kept for compatibility)
             pdf_images: Optional list of relevant PDF images to include
         
         Returns:
@@ -166,61 +113,90 @@ class ImageGenerator:
         logger.info(f"Generating content slide {content.index}: {content.title}")
         
         # Build prompt for content slide
-        prompt = f"""
-        Generate a presentation slide image with the following content:
+        base_prompt = f"""
+Generate a professional academic presentation slide with the following content:
 
-        Slide Title: {content.title}
-        Main Points: {', '.join(content.main_points)}
-        Visual Elements: {content.visual_elements}
+**Slide Title**: {content.title}
 
-        Style: Clean, professional, suitable for academic presentation
-        Layout: Organized, readable, with appropriate spacing
-        """
+**Main Points**:
+{self._format_points(content.main_points)}
+
+**Visual Elements**: {content.visual_elements}
+
+**Layout Requirements**:
+- Clear, readable typography
+- Appropriate spacing and margins
+- Professional color scheme
+- Well-organized content
+- Suitable for academic presentation
+"""
         
+        # Add notes if present
         if content.notes:
-            prompt += f"\nAdditional Notes: {content.notes}"
+            base_prompt += f"\n**Additional Context**: {content.notes}"
         
-        # Prepare reference images
-        ref_images = []
-        if references:
-            # Use up to 2 most recent reference slides
-            for ref_slide in references[-2:]:  # Use last 2 slides as reference
-                ref_images.append(ref_slide.image)
-        
-        # Add PDF images if provided
-        figure_descriptions = ""
+        # Add PDF image context if available
         if pdf_images:
-            figure_descriptions = f"Relevant figures from the paper: {', '.join(pdf_images)}"
-            prompt += f"\n{figure_descriptions}"
+            base_prompt += f"\n**Relevant Figures**: Consider incorporating elements from {len(pdf_images)} related figures from the paper"
         
-        # Generate the slide
-        start_time = __import__('time').time()
+        # Generate with style consistency
+        start_time = time.time()
         image_bytes = self.gemini_client.generate_image(
-            prompt=prompt,
-            reference_images=ref_images,
+            prompt=base_prompt,
+            style_description=self.style_description,  # Use extracted style
             aspect_ratio="16:9",
             image_size="4K"
         )
-        generation_time = __import__('time').time() - start_time
+        generation_time = time.time() - start_time
         
         # Create generated slide
         slide = GeneratedSlide(
             index=content.index,
             type=content.type,
             image=image_bytes,
-            prompt=prompt,
+            prompt=base_prompt,
             generation_time=generation_time,
             content=content
         )
         
-        # Add to reference slides for future consistency (but limit to 2)
-        self.reference_slides.append(slide)
-        if len(self.reference_slides) > 2:
-            # Keep only the last 2 slides as references to avoid too many images
-            self.reference_slides = self.reference_slides[-2:]
-        
         logger.info(f"Content slide {content.index} generated successfully")
         return slide
+    
+    def _extract_and_store_style(self, image_bytes: bytes) -> None:
+        """
+        Extract and store style description from an image.
+        
+        Args:
+            image_bytes: Image data to analyze
+        """
+        logger.debug("Extracting style description from title slide")
+        
+        try:
+            # Save image temporarily for analysis
+            temp_image = BytesIO(image_bytes)
+            pil_image = Image.open(temp_image)
+            
+            # Convert back to bytes for style extraction
+            style_bytes = BytesIO()
+            pil_image.save(style_bytes, format='PNG')
+            
+            # Extract style description
+            self.style_description = self.gemini_client.extract_style_from_image(
+                image_data=style_bytes.getvalue()
+            )
+            
+            logger.info(f"Style extracted: {self.style_description[:100]}...")
+        except Exception as e:
+            logger.error(f"Style extraction failed: {e}")
+            # Use a default style description
+            self.style_description = """
+Professional academic presentation style with:
+- Clean, modern layout
+- Readable sans-serif typography
+- Professional color scheme (blues/grays)
+- Adequate white space
+- Clear hierarchy and organization
+"""
     
     def _build_title_prompt(self, paper_info: Dict) -> str:
         """
@@ -238,48 +214,45 @@ class ImageGenerator:
         
         authors_str = ", ".join(authors) if isinstance(authors, list) else str(authors)
         
-        # Load title slide prompt template
-        prompt_template = self._get_prompt('title_slide')
-        
-        # Format the prompt with paper information
-        prompt = prompt_template.format(
-            title=title,
-            authors=authors_str,
-            theme=theme
-        )
+        prompt = f"""
+Generate a visually appealing title slide for an academic presentation.
+
+**Title**: {title}
+
+**Authors**: {authors_str}
+
+**Theme**: {theme}
+
+**Requirements**:
+- Modern, professional, academic style
+- Clear title prominently displayed
+- Author names clearly visible
+- Incorporate visual metaphor or abstract representation related to: {theme}
+- Professional color scheme
+- Clean typography (sans-serif recommended)
+- Appropriate for academic conference presentation
+
+**Layout**:
+- Title: Large, centered or prominently placed
+- Authors: Below title, medium size
+- Optional: Subtle background design or academic imagery
+- Ensure excellent readability
+"""
         
         return prompt
     
-    def _get_prompt(self, prompt_name: str) -> str:
+    def _format_points(self, points: List[str]) -> str:
         """
-        Get prompt template from file.
+        Format main points for inclusion in prompt.
         
         Args:
-            prompt_name: Name of the prompt file (without extension)
+            points: List of main points
         
         Returns:
-            Prompt text
+            Formatted string
         """
-        prompt_file = Path(f"src/llm/prompts/{prompt_name}.txt")
-        try:
-            return prompt_file.read_text()
-        except FileNotFoundError:
-            logger.warning(f"Prompt file {prompt_file} not found, using default")
-            # Return a default prompt
-            if prompt_name == "title_slide":
-                return (
-                    "Generate a visually appealing title slide for an academic presentation.\n"
-                    "\nTitle: {title}\nAuthors: {authors}\nKey Theme: {theme}\n"
-                    "\nStyle: Modern, professional, academic\n"
-                    "Include: Title, authors, key visual metaphor for the research"
-                )
-            elif prompt_name == "content_slide":
-                return (
-                    "Generate a presentation slide image with the following content:\n"
-                    "\nSlide Title: {title}\nMain Points: {points}\nVisual Theme: {theme}\n"
-                    "\nReference Images: Maintain visual consistency with the provided reference slides.\n"
-                    "Extracted Figures: {figure_descriptions}\n"
-                    "\nStyle: Clean, professional, suitable for academic presentation"
-                )
-            else:
-                return "Create a professional slide with the provided content."
+        if not points:
+            return "  (No specific points provided)"
+        
+        formatted = "\n".join([f"  • {point}" for point in points])
+        return formatted

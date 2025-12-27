@@ -235,3 +235,43 @@ class GenerationConfig(BaseModel):
     style: str = Field("professional", description="Visual style")
     safety_filter_level: str = Field("block_some", description="Safety filter")
     number_of_images: int = Field(1, ge=1, le=4, description="Number of images")
+
+
+# Schemas for structured output from Gemini
+
+class KeyPointSchema(BaseModel):
+    """Schema for a key point in paper analysis (for structured output)."""
+    title: str = Field(description="Short title for the key point")
+    content: str = Field(description="Detailed content")
+    importance: float = Field(ge=0.0, le=1.0, description="Importance score")
+    section: str = Field(description="Source section")
+    related_figure_pages: List[int] = Field(default_factory=list, description="Page numbers of related figures")
+
+
+class PaperAnalysisSchema(BaseModel):
+    """Schema for paper analysis structured output."""
+    summary: str = Field(description="Overall summary of the paper")
+    research_question: str = Field(description="Main research question")
+    methodology: str = Field(description="Research methodology description")
+    key_contributions: List[str] = Field(min_items=1, description="Key contributions")
+    key_points: List[KeyPointSchema] = Field(min_items=1, description="Detailed key points")
+    recommended_slide_count: int = Field(ge=5, le=20, description="Recommended number of slides")
+    visual_theme: str = Field(description="Suggested visual theme")
+
+
+class SlideSpec(BaseModel):
+    """Schema for a single slide specification (for structured output)."""
+    index: int = Field(ge=0, description="Slide index")
+    type: str = Field(description="Slide type (title, agenda, content, figure, conclusion)")
+    title: str = Field(description="Slide title")
+    key_points: List[str] = Field(description="Key points to cover (3-5 items)")
+    visual_suggestions: str = Field(description="Visual element suggestions")
+    related_figure_pages: List[int] = Field(default_factory=list, description="Page numbers of related figures")
+
+
+class PresentationPlanSchema(BaseModel):
+    """Schema for presentation plan structured output."""
+    slide_count: int = Field(ge=5, le=20, description="Total number of slides")
+    slides: List[SlideSpec] = Field(min_items=1, description="Slide specifications")
+    style_description: str = Field(description="Overall presentation style description")
+    presentation_flow: str = Field(description="Description of how the presentation flows")

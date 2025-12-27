@@ -1,15 +1,22 @@
 """
 Analyze academic papers using Gemini's document understanding capabilities.
 
-Extracts key information, contributions, methodology, and identifies important figures.
+Extracts key information, contributions, methodology, and identifies important figures
+using structured output for reliable parsing.
 """
 
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from src.llm.gemini_client import GeminiClient
 from src.utils.logger import get_logger
-from src.utils.models import ExtractedImage, KeyPoint, PaperAnalysis
+from src.utils.models import (
+    ExtractedImage,
+    KeyPoint,
+    PaperAnalysis,
+    PaperAnalysisSchema,
+    KeyPointSchema
+)
 
 logger = get_logger("document_analyzer")
 
@@ -20,6 +27,7 @@ class DocumentAnalyzer:
     
     Extracts key information from academic papers including research question,
     methodology, contributions, and identifies important figures for presentation.
+    Uses structured output for reliable and consistent parsing.
     """
     
     def __init__(self, gemini_client: GeminiClient):
@@ -31,11 +39,13 @@ class DocumentAnalyzer:
         """
         self.gemini_client = gemini_client
         self.logger = logger
-        logger.info("DocumentAnalyzer initialized")
+        logger.info("DocumentAnalyzer initialized with structured output support")
     
     def analyze_paper(self, pdf_path: Path) -> PaperAnalysis:
         """
         Analyze entire PDF with Gemini's document understanding.
+        
+        Uses structured output to ensure reliable parsing of the analysis.
         
         Args:
             pdf_path: Path to PDF file to analyze
@@ -51,8 +61,8 @@ class DocumentAnalyzer:
         """
         logger.info(f"Analyzing paper: {pdf_path}")
         
-        # Get paper analysis prompt
-        prompt = self._get_prompt('paper_analysis')
+        # Step 1: Get initial analysis from PDF
+        prompt = self._get_analysis_prompt()
         
         # Analyze the document
         analysis_text = self.gemini_client.analyze_document(
@@ -62,8 +72,15 @@ class DocumentAnalyzer:
         
         logger.debug(f"Raw analysis text length: {len(analysis_text)}")
         
-        # Parse the analysis into structured format
-        return self._parse_analysis(analysis_text)
+        # Step 2: Parse into structured format using Gemini's structured output
+        structured_analysis = self._parse_to_structured_format(analysis_text)
+        
+        # Step 3: Convert schema to PaperAnalysis model
+        paper_analysis = self._convert_to_paper_analysis(structured_analysis)
+        
+        logger.info(f"Analysis complete: {len(paper_analysis.key_points)} key points identified")
+        
+        return paper_analysis
     
     def extract_key_points(self, analysis: PaperAnalysis) -> List[KeyPoint]:
         """
@@ -78,223 +95,246 @@ class DocumentAnalyzer:
         logger.info("Extracting key points from analysis")
         return analysis.key_points
     
-    def identify_important_figures(self, pdf_images: List[ExtractedImage]) -> List[int]:
+    def identify_important_figures(
+        self, 
+        pdf_images: List[ExtractedImage],
+        paper_analysis: PaperAnalysis
+    ) -> List[int]:
         """
         Identify which extracted figures are most important for presentation.
         
+        Uses quality scores and optionally Gemini to analyze image relevance.
+        
         Args:
             pdf_images: List of extracted images from PDF
+            paper_analysis: Paper analysis for context
         
         Returns:
             List of indices of important figures
         """
         logger.info(f"Identifying important figures from {len(pdf_images)} extracted images")
         
-        # For now, return the indices of all high-quality images
-        # In a more advanced implementation, we could use Gemini to analyze
-        # each image and determine its importance for the presentation
-        important_indices = [
-            idx for idx, img in enumerate(pdf_images)
-            if img.quality_score >= 0.6  # threshold for important figures
+        # Filter by quality score first
+        high_quality_images = [
+            (idx, img) for idx, img in enumerate(pdf_images)
+            if img.quality_score >= 0.6
         ]
+        
+        logger.info(f"Found {len(high_quality_images)} high-quality images")
+        
+        # If we have too many, prioritize by quality and size
+        if len(high_quality_images) > 10:
+            # Sort by quality score descending
+            high_quality_images.sort(key=lambda x: x[1].quality_score, reverse=True)
+            high_quality_images = high_quality_images[:10]
+        
+        important_indices = [idx for idx, _ in high_quality_images]
         
         logger.info(f"Identified {len(important_indices)} important figures")
         return important_indices
     
-    def _get_prompt(self, prompt_name: str) -> str:
+    def describe_pdf_images(
+        self, 
+        pdf_images: List[ExtractedImage],
+        limit: int = 10
+    ) -> Dict[int, str]:
         """
-        Get prompt template from file.
+        Generate descriptions for important PDF images.
         
         Args:
-            prompt_name: Name of the prompt file (without extension)
+            pdf_images: List of extracted images
+            limit: Maximum number of images to describe
+        
+        Returns:
+            Dictionary mapping image index to description
+        """
+        logger.info(f"Generating descriptions for up to {limit} images")
+        
+        descriptions = {}
+        important_images = [
+            (idx, img) for idx, img in enumerate(pdf_images)
+            if img.quality_score >= 0.6 and img.file_path
+        ]
+        
+        # Sort by quality and limit
+        important_images.sort(key=lambda x: x[1].quality_score, reverse=True)
+        important_images = important_images[:limit]
+        
+        for idx, img in important_images:
+            try:
+                description = self.gemini_client.describe_image(
+                    image_path=img.file_path,
+                    prompt="""
+Describe this figure from an academic paper comprehensively:
+
+1. **Type**: What kind of visualization is this? (graph, diagram, photo, chart, equation, table, etc.)
+2. **Content**: What are the main elements, data, or information shown?
+3. **Purpose**: What does it illustrate or demonstrate?
+4. **Key Insights**: What are the key findings or messages conveyed?
+5. **Presentation Value**: How important would this be in a presentation? (High/Medium/Low)
+
+Provide a clear, concise description suitable for determining slide placement.
+"""
+                )
+                descriptions[idx] = description
+                logger.debug(f"Described image {idx} from page {img.page_num}")
+            except Exception as e:
+                logger.warning(f"Failed to describe image {idx}: {e}")
+                continue
+        
+        logger.info(f"Successfully described {len(descriptions)} images")
+        return descriptions
+    
+    def _get_analysis_prompt(self) -> str:
+        """
+        Get prompt template for paper analysis.
         
         Returns:
             Prompt text
         """
-        # In a complete implementation, this would load from a prompt manager
-        # For now, we'll use a simple implementation
-        prompt_file = Path(f"src/llm/prompts/{prompt_name}.txt")
+        prompt_file = Path("src/llm/prompts/paper_analysis.txt")
         try:
-            return prompt_file.read_text()
+            base_prompt = prompt_file.read_text()
         except FileNotFoundError:
             logger.warning(f"Prompt file {prompt_file} not found, using default")
-            # Return a default prompt
-            if prompt_name == "paper_analysis":
-                return (
-                    "Analyze this academic paper comprehensively. Focus on:\n"
-                    "1. Main research question and motivation\n"
-                    "2. Key methodology and approach\n"
-                    "3. Main results and contributions\n"
-                    "4. Important figures and their significance\n"
-                    "5. Potential visual representations for a presentation\n"
-                    "\nProvide a structured analysis suitable for creating a presentation."
-                )
-            else:
-                return "Analyze this document and provide a comprehensive summary."
+            base_prompt = """Analyze this academic paper comprehensively."""
+        
+        # Enhance with structured output instructions
+        enhanced_prompt = f"""{base_prompt}
+
+Please provide a comprehensive analysis focusing on:
+
+1. **Summary**: A clear, concise overview of the paper (2-3 sentences)
+2. **Research Question**: The main research question or objective
+3. **Methodology**: The approach and methods used
+4. **Key Contributions**: The main contributions (3-5 items)
+5. **Key Points**: Detailed points for presentation (5-10 items), each with:
+   - Title (brief, descriptive)
+   - Content (detailed explanation)
+   - Importance (how important for presentation, 0.0-1.0)
+   - Section (which part of paper)
+   - Related figures (page numbers if applicable)
+6. **Recommended Slides**: Suggested number of slides (5-20)
+7. **Visual Theme**: Suggested visual theme for the presentation
+
+Provide detailed analysis suitable for creating an effective academic presentation.
+"""
+        
+        return enhanced_prompt
     
-    def _parse_analysis(self, analysis_text: str) -> PaperAnalysis:
+    def _parse_to_structured_format(self, analysis_text: str) -> PaperAnalysisSchema:
         """
-        Parse raw analysis text into structured PaperAnalysis object.
+        Parse raw analysis text into structured format using Gemini.
         
         Args:
             analysis_text: Raw analysis text from Gemini
         
         Returns:
-            PaperAnalysis object with structured information
+            PaperAnalysisSchema object with structured information
         """
-        logger.debug("Parsing analysis text into structured format")
+        logger.debug("Parsing analysis into structured format")
         
-        # For now, we'll create a basic implementation
-        # In a more advanced version, we could use NLP techniques or 
-        # structured output from Gemini to parse the analysis
+        structure_prompt = f"""
+Based on the following paper analysis, extract structured information in JSON format.
+
+ANALYSIS:
+{analysis_text}
+
+Extract and structure the following information:
+1. summary: Overall summary (string)
+2. research_question: Main research question (string)
+3. methodology: Research methodology description (string)
+4. key_contributions: List of key contributions (list of strings, 3-5 items)
+5. key_points: List of key points for presentation (list of objects), each with:
+   - title: Brief title (string)
+   - content: Detailed content (string)
+   - importance: Importance score 0.0-1.0 (float)
+   - section: Source section (string)
+   - related_figure_pages: Page numbers of related figures (list of integers)
+6. recommended_slide_count: Recommended number of slides 5-20 (integer)
+7. visual_theme: Suggested visual theme (string)
+
+Ensure the output is valid JSON matching the schema.
+"""
         
-        # This is a simplified implementation - in practice, you'd want to 
-        # use more sophisticated parsing or Gemini's structured output capabilities
-        lines = analysis_text.split('\n')
-        
-        # Find key sections in the analysis
-        summary = self._extract_section(analysis_text, ['summary', 'overview'])
-        research_question = self._extract_section(analysis_text, ['research question', 'main question', 'objective'])
-        methodology = self._extract_section(analysis_text, ['methodology', 'approach', 'method'])
-        contributions = self._extract_section_list(analysis_text, ['contributions', 'key contributions', 'main contributions'])
-        
-        # Create key points from important parts of the analysis
-        key_points = self._create_key_points(analysis_text)
-        
-        # Create a basic paper analysis
-        paper_analysis = PaperAnalysis(
-            summary=summary or "No summary found in analysis",
-            research_question=research_question or "Research question not identified",
-            methodology=methodology or "Methodology not clearly described",
-            key_contributions=contributions or ["Contributions not clearly identified"],
-            key_points=key_points,
-            important_figures=[],  # Will be populated by identify_important_figures
-            recommended_slide_count=min(max(8, len(key_points)), 15),  # Between 8-15 slides
-            visual_theme="professional academic"  # Default theme
-        )
-        
-        logger.info("Successfully parsed analysis into structured format")
-        return paper_analysis
+        try:
+            structured_analysis = self.gemini_client.generate_structured_output(
+                prompt=structure_prompt,
+                response_schema=PaperAnalysisSchema
+            )
+            logger.info("Successfully parsed analysis into structured format")
+            return structured_analysis
+        except Exception as e:
+            logger.error(f"Structured parsing failed: {e}")
+            # Fallback to creating a basic structure
+            return self._create_fallback_analysis(analysis_text)
     
-    def _extract_section(self, text: str, keywords: List[str]) -> str:
+    def _create_fallback_analysis(self, analysis_text: str) -> PaperAnalysisSchema:
         """
-        Extract a section from text based on keywords.
-        
-        Args:
-            text: Text to search in
-            keywords: List of keywords that identify the section
-        
-        Returns:
-            Extracted section text
-        """
-        text_lower = text.lower()
-        
-        for keyword in keywords:
-            pos = text_lower.find(keyword)
-            if pos != -1:
-                # Find the start of the section (after the keyword)
-                start = pos + len(keyword)
-                # Find the end of the section (next major heading or end of text)
-                end = len(text)
-                
-                # Look for common section separators
-                for separator in ['\n\n', '\n1.', '\n2.', '\n##', '\nResearch question', '\nMethodology']:
-                    next_section = text.find(separator, start)
-                    if 0 < next_section < end:
-                        end = next_section
-                
-                # Extract the section content
-                section = text[start:end].strip()
-                
-                # Remove leading colons, dashes, etc.
-                if section.startswith(':'):
-                    section = section[1:].strip()
-                
-                return section
-        
-        return ""
-    
-    def _extract_section_list(self, text: str, keywords: List[str]) -> List[str]:
-        """
-        Extract a list of items from a section based on keywords.
-        
-        Args:
-            text: Text to search in
-            keywords: List of keywords that identify the section
-        
-        Returns:
-            List of extracted items
-        """
-        section_text = self._extract_section(text, keywords)
-        
-        if not section_text:
-            return []
-        
-        # Try to identify list items
-        items = []
-        
-        # Look for numbered lists
-        import re
-        number_pattern = r'(?:^|\n)\s*\d+\.\s*(.*?)(?=\n\s*\d+\.|\n\s*##|\n\s*Abstract|$)'
-        matches = re.findall(number_pattern, section_text, re.DOTALL)
-        
-        if matches:
-            items = [item.strip() for item in matches if item.strip()]
-        else:
-            # Look for bullet points or other separators
-            lines = section_text.split('\n')
-            for line in lines:
-                # Check if line looks like a list item
-                if line.strip().startswith(('-', '*', '•', '◦', '▪')):
-                    items.append(line.strip()[1:].strip())
-                elif line.strip().startswith(('1.', '2.', '3.', '4.', '5.')):
-                    items.append(line.strip()[3:].strip())
-        
-        return items if items else [section_text]
-    
-    def _create_key_points(self, analysis_text: str) -> List[KeyPoint]:
-        """
-        Create KeyPoint objects from analysis text.
+        Create a fallback analysis if structured parsing fails.
         
         Args:
             analysis_text: Raw analysis text
         
         Returns:
-            List of KeyPoint objects
+            Basic PaperAnalysisSchema
         """
-        # This is a simplified implementation
-        # In a more advanced version, we could use Gemini to create structured key points
+        logger.warning("Using fallback analysis structure")
         
-        # Extract potential key points based on common academic paper sections
-        sections = [
-            ("Research Question", self._extract_section(analysis_text, ["research question", "main question"])),
-            ("Methodology", self._extract_section(analysis_text, ["methodology", "approach"])),
-            ("Key Contributions", self._extract_section(analysis_text, ["contributions", "contributions"])),
-            ("Main Results", self._extract_section(analysis_text, ["results", "findings"])),
-            ("Conclusions", self._extract_section(analysis_text, ["conclusion", "conclusions"])),
-        ]
+        # Create basic key points from text paragraphs
+        paragraphs = [p.strip() for p in analysis_text.split('\n\n') if len(p.strip()) > 50]
         
         key_points = []
-        for title, content in sections:
-            if content.strip():
-                key_points.append(KeyPoint(
-                    title=title,
-                    content=content,
-                    importance=0.8,  # Default importance
-                    section="analysis",
-                    related_figures=[]
-                ))
+        for i, para in enumerate(paragraphs[:7]):  # Max 7 key points
+            key_points.append(KeyPointSchema(
+                title=f"Key Point {i+1}",
+                content=para[:500],  # Limit content length
+                importance=0.7 - (i * 0.05),  # Decreasing importance
+                section="general",
+                related_figure_pages=[]
+            ))
         
-        # If we couldn't extract specific sections, just take the first few paragraphs
-        if not key_points:
-            paragraphs = [p.strip() for p in analysis_text.split('\n\n') if p.strip() and len(p) > 50]
-            for i, para in enumerate(paragraphs[:5]):  # Take up to 5 paragraphs
-                key_points.append(KeyPoint(
-                    title=f"Key Point {i+1}",
-                    content=para,
-                    importance=0.7 - (i * 0.1),  # Decreasing importance
-                    section="general",
-                    related_figures=[]
-                ))
+        return PaperAnalysisSchema(
+            summary=analysis_text[:500] if len(analysis_text) > 500 else analysis_text,
+            research_question="Research question extracted from paper",
+            methodology="Methodology extracted from paper",
+            key_contributions=["Contribution analysis needed"],
+            key_points=key_points,
+            recommended_slide_count=min(len(key_points) + 3, 12),
+            visual_theme="professional academic"
+        )
+    
+    def _convert_to_paper_analysis(self, schema: PaperAnalysisSchema) -> PaperAnalysis:
+        """
+        Convert PaperAnalysisSchema to PaperAnalysis model.
         
-        return key_points
+        Args:
+            schema: PaperAnalysisSchema from structured output
+        
+        Returns:
+            PaperAnalysis model
+        """
+        logger.debug("Converting schema to PaperAnalysis model")
+        
+        # Convert key points
+        key_points = [
+            KeyPoint(
+                title=kp.title,
+                content=kp.content,
+                importance=kp.importance,
+                section=kp.section,
+                related_figures=kp.related_figure_pages
+            )
+            for kp in schema.key_points
+        ]
+        
+        return PaperAnalysis(
+            summary=schema.summary,
+            research_question=schema.research_question,
+            methodology=schema.methodology,
+            key_contributions=schema.key_contributions,
+            key_points=key_points,
+            important_figures=[],  # Will be filled by identify_important_figures
+            recommended_slide_count=schema.recommended_slide_count,
+            visual_theme=schema.visual_theme
+        )

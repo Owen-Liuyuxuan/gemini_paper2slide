@@ -278,7 +278,7 @@ class GeminiClient:
     def generate_image(
         self,
         prompt: str,
-        reference_images: Optional[List[Union[Path, bytes, Image.Image]]] = None,
+        style_description: Optional[str] = None,
         base_image: Optional[Union[Path, bytes, Image.Image]] = None,
         aspect_ratio: str = "16:9",
         image_size: str = "4K",
@@ -288,15 +288,16 @@ class GeminiClient:
         """
         Generate image using Gemini's image generation model.
         
-        Supports three modes:
+        Supports two modes:
         1. Text-to-Image: Generate from text prompt only
         2. Image-to-Image: Edit/modify a base image with text prompt
-        3. Style-consistent generation: Use reference images for style consistency
+        
+        For visual consistency across slides, use enhanced prompts with style_description
+        instead of reference images (which are not supported by the API).
         
         Args:
             prompt: Image generation prompt
-            reference_images: List of reference images for STYLE CONSISTENCY
-                             (passed in ImageConfig, not as content)
+            style_description: Optional style description for consistency (extracted from previous slides)
             base_image: Base image for IMAGE EDITING (passed as content)
             aspect_ratio: Image aspect ratio (16:9, 4:3, 1:1, 9:16, etc.)
             image_size: Image size (4K, 1080p, 720p)
@@ -314,20 +315,21 @@ class GeminiClient:
             >>> 
             >>> # Mode 1: Text-to-Image
             >>> image = client.generate_image(
-            ...     prompt="Modern academic presentation title slide"
+            ...     prompt="Modern academic presentation title slide with blue gradient"
             ... )
             >>> 
-            >>> # Mode 2: Image-to-Image (editing)
-            >>> image = client.generate_image(
-            ...     prompt="Add neon lights to this image",
-            ...     base_image=Path("original.png")
-            ... )
-            >>> 
-            >>> # Mode 3: Style-consistent generation with reference images
+            >>> # Mode 1 with style consistency
+            >>> style = "Blue gradient background, white text, clean sans-serif font, minimalist design"
             >>> image = client.generate_image(
             ...     prompt="Content slide about methodology",
-            ...     reference_images=[Path("title.png"), Path("slide2.png")],
+            ...     style_description=style,
             ...     aspect_ratio="16:9"
+            ... )
+            >>> 
+            >>> # Mode 2: Image-to-Image editing
+            >>> image = client.generate_image(
+            ...     prompt="Add emphasis to the title section",
+            ...     base_image=Path("original.png")
             ... )
         """
         logger.info(f"Generating image with prompt: {prompt[:100]}...")
@@ -365,40 +367,27 @@ class GeminiClient:
                     )
                 )
             
+            # Enhance prompt with style description for consistency
+            enhanced_prompt = prompt
+            if style_description and not base_image:
+                logger.debug("Enhancing prompt with style description for consistency")
+                enhanced_prompt = f"""{prompt}
+
+**Style Requirements for Visual Consistency:**
+{style_description}
+
+Ensure this slide maintains the same visual style, color scheme, and design language as described above."""
+            
             # Add prompt to content
-            content_parts.append(prompt)
+            content_parts.append(enhanced_prompt)
             
             # Prepare ImageConfig
+            # Note: ImageConfig does NOT support reference_images parameter
+            # Style consistency must be achieved through enhanced prompts
             image_config_params = {
                 "aspect_ratio": aspect_ratio,
                 "image_size": image_size,
             }
-            
-            # Mode 3: Style-consistent generation
-            # Reference images are passed in CONFIG (for style consistency)
-            if reference_images and not base_image:
-                logger.debug(f"Style-consistent mode: using {len(reference_images)} reference images")
-                
-                reference_bytes_list = []
-                for idx, ref in enumerate(reference_images):
-                    if isinstance(ref, Path):
-                        ref_data = ref.read_bytes()
-                    elif isinstance(ref, bytes):
-                        ref_data = ref
-                    elif isinstance(ref, Image.Image):
-                        buffer = BytesIO()
-                        ref.save(buffer, format='PNG')
-                        ref_data = buffer.getvalue()
-                    else:
-                        logger.warning(f"Unsupported reference image type: {type(ref)}")
-                        continue
-                    
-                    reference_bytes_list.append(ref_data)
-                    logger.debug(f"Added reference image {idx + 1}")
-                
-                # Add reference images to ImageConfig
-                if reference_bytes_list:
-                    image_config_params["reference_images"] = reference_bytes_list
             
             # Generate image with configuration
             response = self.client.models.generate_content(
@@ -437,6 +426,88 @@ class GeminiClient:
         except Exception as e:
             logger.error(f"Image generation failed: {e}")
             raise
+    
+    def extract_style_from_image(
+        self,
+        image_path: Optional[Path] = None,
+        image_data: Optional[bytes] = None,
+        model: Optional[str] = None
+    ) -> str:
+        """
+        Extract style description from an image for use in subsequent generations.
+        
+        This is used to maintain visual consistency across slides by describing
+        the style of the first slide and using that description in prompts for
+        subsequent slides.
+        
+        Args:
+            image_path: Path to image file
+            image_data: Raw image bytes (alternative to image_path)
+            model: Model name (overrides default)
+        
+        Returns:
+            Style description string
+        
+        Example:
+            >>> client = GeminiClient()
+            >>> style = client.extract_style_from_image(
+            ...     image_path=Path("title_slide.png")
+            ... )
+            >>> print(style)
+            "Blue gradient background from dark to light blue, white text in clean sans-serif font..."
+        """
+        if image_path is None and image_data is None:
+            raise ValueError("Either image_path or image_data must be provided")
+        
+        logger.debug("Extracting style description from image")
+        
+        try:
+            # Load image data if path provided
+            if image_path and image_data is None:
+                image_data = image_path.read_bytes()
+                mime_type = self._get_mime_type(image_path)
+            else:
+                mime_type = "image/png"
+            
+            model_name = model or self.model_text
+            
+            style_extraction_prompt = """
+Analyze this presentation slide image and provide a detailed style description that captures:
+
+1. **Color Scheme**: Primary and secondary colors, background color/gradient
+2. **Typography**: Font style (serif/sans-serif), text color, size hierarchy
+3. **Layout Style**: Alignment, spacing, margins, visual balance
+4. **Design Elements**: Any decorative elements, shapes, icons, borders
+5. **Overall Aesthetic**: Modern/traditional, minimalist/detailed, professional/creative
+
+Provide a concise but comprehensive description (100-150 words) that could be used to maintain visual consistency in subsequent slides.
+Focus on objective visual characteristics rather than content.
+"""
+            
+            # Generate style description
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=[
+                    types.Part.from_bytes(
+                        data=image_data,
+                        mime_type=mime_type,
+                    ),
+                    style_extraction_prompt
+                ],
+                config=types.GenerateContentConfig(
+                    temperature=0.3,  # Lower temperature for more consistent descriptions
+                )
+            )
+            
+            style_description = response.text
+            logger.debug(f"Extracted style description: {style_description[:100]}...")
+            
+            return style_description
+            
+        except Exception as e:
+            logger.error(f"Style extraction failed: {e}")
+            # Return a default style if extraction fails
+            return "Professional academic presentation style with clean layout and readable typography"
     
     @retry(
         retry=retry_if_exception_type((Exception,)),

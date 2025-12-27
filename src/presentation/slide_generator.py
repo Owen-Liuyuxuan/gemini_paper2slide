@@ -2,7 +2,7 @@
 Coordinate the slide generation workflow.
 
 Orchestrates the entire slide generation process using the image generator
-and maintains reference images for visual consistency.
+with a 3-stage workflow: title → content with style consistency.
 """
 
 from typing import List
@@ -19,8 +19,9 @@ class SlideGenerator:
     """
     Coordinate slide generation workflow.
     
-    Manages the entire slide generation process, using reference images
-    to maintain visual consistency across all slides in the presentation.
+    Implements a 3-stage workflow:
+    1. Generate title slide (extract style)
+    2. Generate remaining slides using extracted style for consistency
     """
     
     def __init__(self, image_generator: ImageGenerator, style_manager: StyleManager):
@@ -35,41 +36,19 @@ class SlideGenerator:
         self.style_manager = style_manager
         self.logger = logger
         
-        logger.info("SlideGenerator initialized")
+        logger.info("SlideGenerator initialized with 3-stage workflow")
     
-    def generate_presentation(self, presentation_plan: PresentationPlan) -> List[GeneratedSlide]:
-        """
-        Generate complete presentation from plan.
-        
-        Args:
-            presentation_plan: Complete presentation plan
-        
-        Returns:
-            List of GeneratedSlide objects
-        """
-        logger.info(f"Generating presentation with {presentation_plan.total_slides} slides")
-        
-        slides = []
-        
-        # Generate slides one by one
-        for i, slide_content in enumerate(presentation_plan.slides):
-            logger.info(f"Generating slide {i+1}/{len(presentation_plan.slides)}: {slide_content.title}")
-            
-            # Generate the slide
-            generated_slide = self.image_generator.generate_content_slide(
-                content=slide_content,
-                references=self.image_generator.reference_slides,
-                pdf_images=[]  # Will be filled in generate_slide_sequence
-            )
-            
-            slides.append(generated_slide)
-        
-        logger.info(f"Successfully generated {len(slides)} slides")
-        return slides
-    
-    def generate_slide_sequence(self, plan: PresentationPlan, pdf_images: List[ExtractedImage]) -> List[GeneratedSlide]:
+    def generate_slide_sequence(
+        self, 
+        plan: PresentationPlan, 
+        pdf_images: List[ExtractedImage]
+    ) -> List[GeneratedSlide]:
         """
         Generate slides in sequence maintaining visual consistency.
+        
+        Implements the proper 3-stage workflow:
+        1. Generate title slide (special handling, extracts style)
+        2. Generate all content slides using extracted style
         
         Args:
             plan: Presentation plan with slide content
@@ -78,13 +57,39 @@ class SlideGenerator:
         Returns:
             List of generated slide images
         """
-        logger.info("Starting sequential slide generation")
+        logger.info(f"Starting 3-stage slide generation for {plan.total_slides} slides")
         
         generated_slides = []
         
-        # Process each slide in the plan
-        for idx, slide_content in enumerate(plan.slides):
-            logger.debug(f"Processing slide {slide_content.index}: {slide_content.title}")
+        # STAGE 1: Generate title slide (special handling)
+        if len(plan.slides) > 0 and plan.slides[0].type.value == "title":
+            logger.info("STAGE 1: Generating title slide with style extraction")
+            
+            title_info = {
+                "title": plan.metadata.title,
+                "authors": plan.metadata.authors,
+                "theme": plan.analysis.visual_theme
+            }
+            
+            try:
+                title_slide = self.image_generator.generate_title_slide(title_info)
+                generated_slides.append(title_slide)
+                logger.info("✓ Title slide generated, style extracted for consistency")
+            except Exception as e:
+                logger.error(f"Failed to generate title slide: {e}")
+                raise
+            
+            # Start from second slide
+            remaining_slides = plan.slides[1:]
+        else:
+            logger.warning("No title slide found in plan, generating all slides without style extraction")
+            remaining_slides = plan.slides
+        
+        # STAGE 2: Generate all remaining slides using extracted style
+        logger.info(f"STAGE 2: Generating {len(remaining_slides)} content slides with style consistency")
+        
+        for idx, slide_content in enumerate(remaining_slides, start=1):
+            logger.info(f"Generating slide {slide_content.index}/{plan.total_slides}: {slide_content.title}")
             
             # Get related PDF images for this slide
             related_images_paths = []
@@ -92,16 +97,24 @@ class SlideGenerator:
                 if img_idx < len(pdf_images) and pdf_images[img_idx].file_path:
                     related_images_paths.append(str(pdf_images[img_idx].file_path))
             
-            # Generate the slide with reference to previous slides for consistency
-            generated_slide = self.image_generator.generate_content_slide(
-                content=slide_content,
-                references=self.image_generator.reference_slides,  # Use existing references
-                pdf_images=related_images_paths
-            )
-            
-            generated_slides.append(generated_slide)
-            
-            logger.debug(f"Generated slide {slide_content.index}")
+            try:
+                # Generate the slide with style consistency
+                generated_slide = self.image_generator.generate_content_slide(
+                    content=slide_content,
+                    references=self.image_generator.reference_slides,  # Not used but kept for compatibility
+                    pdf_images=related_images_paths
+                )
+                
+                generated_slides.append(generated_slide)
+                logger.info(f"✓ Slide {slide_content.index} generated successfully")
+            except Exception as e:
+                logger.error(f"Failed to generate slide {slide_content.index}: {e}")
+                # Continue with other slides instead of failing completely
+                continue
         
-        logger.info(f"Completed sequential generation of {len(generated_slides)} slides")
+        logger.info(f"✓ Completed slide generation: {len(generated_slides)}/{plan.total_slides} slides successful")
+        
+        if len(generated_slides) < plan.total_slides:
+            logger.warning(f"Only {len(generated_slides)}/{plan.total_slides} slides generated successfully")
+        
         return generated_slides
