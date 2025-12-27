@@ -371,12 +371,14 @@ class GeminiClient:
                 )
             
             # Extract image from response
+            # The image is a special genai class, need to convert to PIL Image
             output_image = None
             for part in response.parts:
                 if part.text is not None:
                     logger.debug(f"Response text: {part.text[:100]}...")
                 elif part.inline_data is not None:
-                    output_image = part.as_image()
+                    # Convert genai image to PIL Image using image_bytes
+                    output_image = Image.open(BytesIO(part.inline_data.image_bytes))
                     break
             
             if output_image is None:
