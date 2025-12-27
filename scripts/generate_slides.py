@@ -16,6 +16,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 from src.llm.document_analyzer import DocumentAnalyzer
 from src.llm.gemini_client import GeminiClient
 from src.llm.image_generator import ImageGenerator
