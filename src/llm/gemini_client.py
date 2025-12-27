@@ -279,6 +279,7 @@ class GeminiClient:
         self,
         prompt: str,
         reference_images: Optional[List[Union[Path, bytes, Image.Image]]] = None,
+        base_image: Optional[Union[Path, bytes, Image.Image]] = None,
         aspect_ratio: str = "16:9",
         image_size: str = "4K",
         model: Optional[str] = None,
@@ -287,12 +288,16 @@ class GeminiClient:
         """
         Generate image using Gemini's image generation model.
         
-        Uses the official google.genai SDK with support for reference images
-        to maintain visual consistency across slides.
+        Supports three modes:
+        1. Text-to-Image: Generate from text prompt only
+        2. Image-to-Image: Edit/modify a base image with text prompt
+        3. Style-consistent generation: Use reference images for style consistency
         
         Args:
             prompt: Image generation prompt
-            reference_images: List of reference images (paths, bytes, or PIL Images)
+            reference_images: List of reference images for STYLE CONSISTENCY
+                             (passed in ImageConfig, not as content)
+            base_image: Base image for IMAGE EDITING (passed as content)
             aspect_ratio: Image aspect ratio (16:9, 4:3, 1:1, 9:16, etc.)
             image_size: Image size (4K, 1080p, 720p)
             model: Model name (overrides default)
@@ -306,23 +311,23 @@ class GeminiClient:
         
         Example:
             >>> client = GeminiClient()
-            >>> # Simple generation
-            >>> image_data = client.generate_image(
-            ...     prompt="Modern academic presentation title slide with blue theme"
+            >>> 
+            >>> # Mode 1: Text-to-Image
+            >>> image = client.generate_image(
+            ...     prompt="Modern academic presentation title slide"
             ... )
             >>> 
-            >>> # With reference images for consistency
-            >>> image_data = client.generate_image(
-            ...     prompt="Content slide showing research methodology",
-            ...     reference_images=[Path("title_slide.png"), Path("slide2.png")],
-            ...     aspect_ratio="16:9",
-            ...     image_size="4K"
+            >>> # Mode 2: Image-to-Image (editing)
+            >>> image = client.generate_image(
+            ...     prompt="Add neon lights to this image",
+            ...     base_image=Path("original.png")
             ... )
             >>> 
-            >>> # Save directly
-            >>> image_data = client.generate_image(
-            ...     prompt="Conclusion slide",
-            ...     save_path=Path("output/slide_10.png")
+            >>> # Mode 3: Style-consistent generation with reference images
+            >>> image = client.generate_image(
+            ...     prompt="Content slide about methodology",
+            ...     reference_images=[Path("title.png"), Path("slide2.png")],
+            ...     aspect_ratio="16:9"
             ... )
         """
         logger.info(f"Generating image with prompt: {prompt[:100]}...")
@@ -333,57 +338,74 @@ class GeminiClient:
             # Prepare content parts
             content_parts = []
             
-            # Add reference images if provided
-            if reference_images:
-                logger.debug(f"Processing {len(reference_images)} reference images")
+            # Mode 2: Image-to-Image editing
+            # Base image is passed as CONTENT (for editing)
+            if base_image:
+                logger.debug("Image-to-Image mode: editing base image")
                 
+                if isinstance(base_image, Path):
+                    base_data = base_image.read_bytes()
+                    mime_type = self._get_mime_type(base_image)
+                elif isinstance(base_image, bytes):
+                    base_data = base_image
+                    mime_type = "image/png"
+                elif isinstance(base_image, Image.Image):
+                    buffer = BytesIO()
+                    base_image.save(buffer, format='PNG')
+                    base_data = buffer.getvalue()
+                    mime_type = "image/png"
+                else:
+                    raise ValueError(f"Unsupported base_image type: {type(base_image)}")
+                
+                # Add base image to content
+                content_parts.append(
+                    types.Part.from_bytes(
+                        data=base_data,
+                        mime_type=mime_type,
+                    )
+                )
+            
+            # Add prompt to content
+            content_parts.append(prompt)
+            
+            # Prepare ImageConfig
+            image_config_params = {
+                "aspect_ratio": aspect_ratio,
+                "image_size": image_size,
+            }
+            
+            # Mode 3: Style-consistent generation
+            # Reference images are passed in CONFIG (for style consistency)
+            if reference_images and not base_image:
+                logger.debug(f"Style-consistent mode: using {len(reference_images)} reference images")
+                
+                reference_bytes_list = []
                 for idx, ref in enumerate(reference_images):
                     if isinstance(ref, Path):
-                        # Load from file
                         ref_data = ref.read_bytes()
-                        mime_type = self._get_mime_type(ref)
                     elif isinstance(ref, bytes):
-                        # Already bytes
                         ref_data = ref
-                        mime_type = "image/png"
                     elif isinstance(ref, Image.Image):
-                        # Convert PIL Image to bytes
                         buffer = BytesIO()
                         ref.save(buffer, format='PNG')
                         ref_data = buffer.getvalue()
-                        mime_type = "image/png"
                     else:
                         logger.warning(f"Unsupported reference image type: {type(ref)}")
                         continue
                     
-                    # Add reference image part
-                    content_parts.append(
-                        types.Part.from_bytes(
-                            data=ref_data,
-                            mime_type=mime_type,
-                        )
-                    )
+                    reference_bytes_list.append(ref_data)
                     logger.debug(f"Added reference image {idx + 1}")
                 
-                # Add instruction for reference images
-                content_parts.append(
-                    "Use the above images as style references. "
-                    "Maintain visual consistency with these reference images "
-                    "in terms of color scheme, layout style, and design elements."
-                )
-            
-            # Add main prompt
-            content_parts.append(prompt)
+                # Add reference images to ImageConfig
+                if reference_bytes_list:
+                    image_config_params["reference_images"] = reference_bytes_list
             
             # Generate image with configuration
             response = self.client.models.generate_content(
                 model=model_name,
                 contents=content_parts,
                 config=types.GenerateContentConfig(
-                    image_config=types.ImageConfig(
-                        aspect_ratio=aspect_ratio,
-                        image_size=image_size
-                    )
+                    image_config=types.ImageConfig(**image_config_params)
                 )
             )
             

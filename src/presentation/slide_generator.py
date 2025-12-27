@@ -50,34 +50,17 @@ class SlideGenerator:
         logger.info(f"Generating presentation with {presentation_plan.total_slides} slides")
         
         slides = []
-        pdf_images_map = {img.page_num: img.file_path for img in presentation_plan.analysis.important_figures}
         
         # Generate slides one by one
         for i, slide_content in enumerate(presentation_plan.slides):
             logger.info(f"Generating slide {i+1}/{len(presentation_plan.slides)}: {slide_content.title}")
             
-            # Get relevant PDF images for this slide
-            relevant_pdf_images = []
-            for img_idx in slide_content.related_pdf_images:
-                if img_idx in pdf_images_map:
-                    relevant_pdf_images.append(pdf_images_map[img_idx])
-            
             # Generate the slide
-            if i == 0:  # First slide is title slide
-                # For the first slide, we need special handling since it's a title
-                # In a complete implementation, we'd pass the paper info to generate_title_slide
-                # For now, we'll use the image generator directly
-                generated_slide = self.image_generator.generate_content_slide(
-                    content=slide_content,
-                    references=self.image_generator.reference_slides,
-                    pdf_images=relevant_pdf_images
-                )
-            else:
-                generated_slide = self.image_generator.generate_content_slide(
-                    content=slide_content,
-                    references=self.image_generator.reference_slides,
-                    pdf_images=relevant_pdf_images
-                )
+            generated_slide = self.image_generator.generate_content_slide(
+                content=slide_content,
+                references=self.image_generator.reference_slides,
+                pdf_images=[]  # Will be filled in generate_slide_sequence
+            )
             
             slides.append(generated_slide)
         
