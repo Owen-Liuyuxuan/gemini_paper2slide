@@ -139,6 +139,11 @@ class GeminiClient:
                 )
             )
             
+            # Check if response has text
+            if not response.text:
+                logger.warning("Empty response from API")
+                return ""
+            
             text = response.text
             logger.debug(f"Generated {len(text)} characters")
             
