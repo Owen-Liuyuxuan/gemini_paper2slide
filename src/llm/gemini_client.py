@@ -377,8 +377,10 @@ class GeminiClient:
                 if part.text is not None:
                     logger.debug(f"Response text: {part.text[:100]}...")
                 elif part.inline_data is not None:
-                    # Convert genai image to PIL Image using image_bytes
-                    output_image = Image.open(BytesIO(part.inline_data.image_bytes))
+                    # Step 1: Get genai image object
+                    output_image = part.as_image()
+                    # Step 2: Convert genai image to PIL Image using image_bytes
+                    output_image = Image.open(BytesIO(output_image.image_bytes))
                     break
             
             if output_image is None:
