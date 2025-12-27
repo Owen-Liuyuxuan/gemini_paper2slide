@@ -96,7 +96,6 @@ def main(
         resume: Whether to resume from last checkpoint
         extract_pdf_images: Whether to extract images from PDF (not recommended)
         use_gemini_figures: Whether to use Gemini's direct figure analysis (recommended)
-    """
         resume: Whether to resume from last checkpoint
         describe_images: Whether to generate descriptions for PDF images
     """
