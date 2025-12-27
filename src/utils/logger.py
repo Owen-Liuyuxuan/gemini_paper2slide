@@ -6,18 +6,21 @@ Provides structured logging with file and console output using loguru.
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from loguru import logger
+from loguru import logger as _logger
 
 from src.utils.config_loader import load_config
+
+if TYPE_CHECKING:
+    from loguru import Logger
 
 
 def setup_logger(
     name: Optional[str] = None,
     log_level: Optional[str] = None,
     log_dir: Optional[Path] = None
-) -> "logger":
+) -> "Logger":
     """
     Set up the application logger with console and file handlers.
     
@@ -52,10 +55,10 @@ def setup_logger(
     log_dir.mkdir(parents=True, exist_ok=True)
     
     # Remove default handler
-    logger.remove()
+    _logger.remove()
     
     # Add console handler
-    logger.add(
+    _logger.add(
         sys.stderr,
         format=log_format,
         level=log_level,
@@ -65,7 +68,7 @@ def setup_logger(
     )
     
     # Add file handler for all logs
-    logger.add(
+    _logger.add(
         log_dir / "paper_to_slides.log",
         format=log_format,
         level="DEBUG",
@@ -77,7 +80,7 @@ def setup_logger(
     )
     
     # Add separate error log
-    logger.add(
+    _logger.add(
         log_dir / "errors.log",
         format=log_format,
         level="ERROR",
@@ -89,14 +92,15 @@ def setup_logger(
     )
     
     # Add context filter if name provided
+    result_logger = _logger
     if name:
-        logger = logger.bind(name=name)
+        result_logger = _logger.bind(name=name)
     
-    logger.info(f"Logger initialized with level: {log_level}")
-    return logger
+    result_logger.info(f"Logger initialized with level: {log_level}")
+    return result_logger
 
 
-def get_logger(name: str) -> "logger":
+def get_logger(name: str) -> "Logger":
     """
     Get a logger instance with a specific name.
     
@@ -110,4 +114,4 @@ def get_logger(name: str) -> "logger":
         >>> logger = get_logger("image_generator")
         >>> logger.debug("Starting image generation")
     """
-    return logger.bind(name=name)
+    return _logger.bind(name=name)
