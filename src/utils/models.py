@@ -248,6 +248,45 @@ class KeyPointSchema(BaseModel):
     related_figure_pages: List[int] = Field(default_factory=list, description="Page numbers of related figures")
 
 
+class FigureDescriptionSchema(BaseModel):
+    """
+    Schema for Gemini's description of a figure/table in the PDF.
+    
+    Gemini analyzes the PDF visually and describes figures without extraction.
+    This avoids the PDF extraction problem where vector graphics are split into sub-elements.
+    """
+    page_number: int = Field(ge=1, description="Page number where figure appears")
+    figure_number: Optional[str] = Field(None, description="Figure/table number or caption (e.g., 'Figure 1', 'Table 2')")
+    figure_type: str = Field(description="Type of visual (figure, table, diagram, chart, plot, etc.)")
+    visual_description: str = Field(
+        description="Detailed description of what is shown visually (colors, layout, components, axes, etc.)"
+    )
+    content_description: str = Field(
+        description="What data or concept the figure illustrates and key findings shown"
+    )
+    importance: float = Field(
+        ge=0.0, le=1.0, 
+        description="Importance for presentation (0-1)"
+    )
+    presentation_usage: str = Field(
+        description="How this figure could be used in presentation slides"
+    )
+
+
+class PaperFiguresSchema(BaseModel):
+    """
+    Schema for comprehensive figure analysis from PDF using Gemini's vision.
+    
+    Contains all figures/tables identified by Gemini through direct PDF visual analysis,
+    avoiding the need for fragile PDF image extraction.
+    """
+    total_figures: int = Field(ge=0, description="Total number of figures/tables identified")
+    figures: List[FigureDescriptionSchema] = Field(
+        default_factory=list,
+        description="Detailed descriptions of each figure/table"
+    )
+
+
 class PaperAnalysisSchema(BaseModel):
     """Schema for paper analysis structured output."""
     summary: str = Field(description="Overall summary of the paper")

@@ -2,7 +2,12 @@ Analyze this academic paper comprehensively. Focus on:
 1. Main research question and motivation
 2. Key methodology and approach
 3. Main results and contributions
-4. Important figures and their significance
+4. Important figures, tables, and their significance (describe what they show visually)
 5. Potential visual representations for a presentation
+
+For each important figure or table you identify:
+- Note which page it appears on
+- Describe what it shows visually
+- Explain its significance to the research
 
 Provide a structured analysis suitable for creating a presentation.

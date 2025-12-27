@@ -95,6 +95,70 @@ class DocumentAnalyzer:
         logger.info("Extracting key points from analysis")
         return analysis.key_points
     
+    def analyze_figures_from_pdf(self, pdf_path: Path) -> Dict[int, str]:
+        """
+        Analyze all figures/tables directly from PDF using Gemini's vision.
+        
+        This method uses Gemini's multimodal capabilities to "see" the entire PDF
+        and describe figures as they appear visually, avoiding the fragile PDF
+        image extraction process that often splits vector graphics into sub-elements.
+        
+        Args:
+            pdf_path: Path to PDF file
+        
+        Returns:
+            Dictionary mapping page numbers to figure descriptions
+            
+        Example:
+            >>> analyzer = DocumentAnalyzer(gemini_client)
+            >>> figures = analyzer.analyze_figures_from_pdf(Path("paper.pdf"))
+            >>> print(figures[3])  # Description of figure on page 3
+        """
+        logger.info(f"Analyzing figures directly from PDF: {pdf_path}")
+        
+        # Get the prompt for figure analysis
+        prompt = self._get_figure_analysis_prompt()
+        
+        # Analyze the document with Gemini
+        try:
+            from src.utils.models import PaperFiguresSchema
+            
+            # Use structured output to get reliable figure descriptions
+            figures_schema = self.gemini_client.generate_structured_output(
+                prompt=prompt,
+                response_schema=PaperFiguresSchema,
+                pdf_path=pdf_path
+            )
+            
+            logger.info(f"Identified {figures_schema.total_figures} figures/tables in PDF")
+            
+            # Convert to dictionary mapping page -> description
+            figure_descriptions = {}
+            for fig in figures_schema.figures:
+                page_key = fig.page_number
+                description = f"""**{fig.figure_number or 'Figure'}** ({fig.figure_type})
+
+Visual Description:
+{fig.visual_description}
+
+Content:
+{fig.content_description}
+
+Presentation Usage:
+{fig.presentation_usage}
+
+Importance: {fig.importance:.2f}"""
+                
+                figure_descriptions[page_key] = description
+                logger.debug(f"Page {page_key}: {fig.figure_number or 'Figure'} (importance: {fig.importance:.2f})")
+            
+            return figure_descriptions
+            
+        except Exception as e:
+            logger.error(f"Figure analysis failed: {e}")
+            logger.warning("Falling back to empty figure descriptions")
+            return {}
+    
     def identify_important_figures(
         self, 
         pdf_images: List[ExtractedImage],
@@ -221,6 +285,33 @@ Provide detailed analysis suitable for creating an effective academic presentati
 """
         
         return enhanced_prompt
+    
+    def _get_figure_analysis_prompt(self) -> str:
+        """
+        Get prompt template for figure analysis from PDF.
+        
+        Returns:
+            Prompt text for analyzing figures/tables directly from PDF
+        """
+        prompt_file = Path("src/llm/prompts/figure_analysis.txt")
+        try:
+            return prompt_file.read_text()
+        except FileNotFoundError:
+            logger.warning(f"Prompt file {prompt_file} not found, using default")
+            return """
+Analyze all figures, tables, and diagrams in this academic paper.
+
+For each visual element (figure, table, diagram, chart, etc.), provide:
+1. Page number where it appears
+2. Figure/table number or caption  
+3. Detailed visual description (what is shown, colors, layout, components)
+4. What data or concept it illustrates
+5. Its importance to the research (rate 0-1)
+6. How it could be used in a presentation slide
+
+Focus on visual elements that would be valuable for presentation slides.
+Describe each figure as if explaining to someone who cannot see it.
+"""
     
     def _parse_to_structured_format(self, analysis_text: str) -> PaperAnalysisSchema:
         """

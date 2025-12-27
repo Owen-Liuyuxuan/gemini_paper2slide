@@ -1,0 +1,12 @@
+Analyze all figures, tables, and diagrams in this academic paper.
+
+For each visual element (figure, table, diagram, chart, etc.), provide:
+1. Page number where it appears
+2. Figure/table number or caption
+3. Detailed visual description (what is shown, colors, layout, components)
+4. What data or concept it illustrates
+5. Its importance to the research (rate 0-1)
+6. How it could be used in a presentation slide
+
+Focus on visual elements that would be valuable for presentation slides.
+Describe each figure as if explaining to someone who cannot see it.

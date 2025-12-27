@@ -83,7 +83,8 @@ def main(
     output_dir: str, 
     use_cache: bool = True, 
     resume: bool = False,
-    describe_images: bool = True
+    extract_pdf_images: bool = False,
+    use_gemini_figures: bool = True
 ) -> None:
     """
     Main workflow for generating presentation slides.
@@ -92,6 +93,10 @@ def main(
         pdf_path: Path to input PDF file
         output_dir: Directory for output slides
         use_cache: Whether to use cached intermediate results
+        resume: Whether to resume from last checkpoint
+        extract_pdf_images: Whether to extract images from PDF (not recommended)
+        use_gemini_figures: Whether to use Gemini's direct figure analysis (recommended)
+    """
         resume: Whether to resume from last checkpoint
         describe_images: Whether to generate descriptions for PDF images
     """
@@ -129,7 +134,7 @@ def main(
         # STEP 1: Extract PDF content
         if not last_step or last_step in ["start"]:
             logger.info("\n" + "="*80)
-            logger.info("STEP 1: Extracting PDF content...")
+            logger.info("STEP 1: Extracting PDF metadata and text...")
             logger.info("="*80)
             
             try:
@@ -140,17 +145,23 @@ def main(
                 logger.info(f"✓ Title: {pdf_metadata.title}")
                 logger.info(f"✓ Authors: {', '.join(pdf_metadata.authors) if pdf_metadata.authors else 'Unknown'}")
                 
-                pdf_images = image_extractor.extract_images(pdf_path_obj)
-                logger.info(f"✓ Extracted {len(pdf_images)} images from PDF")
-                
-                filtered_images = image_extractor.filter_images(pdf_images)
-                logger.info(f"✓ Filtered to {len(filtered_images)} high-quality images")
-                
-                saved_images = image_extractor.save_images(
-                    filtered_images, 
-                    output_path / "extracted_images"
-                )
-                logger.info(f"✓ Saved {len(saved_images)} images")
+                # Image extraction (optional, not recommended for academic papers)
+                saved_images = []
+                if extract_pdf_images:
+                    logger.info("Extracting images from PDF (not recommended for academic papers)...")
+                    pdf_images = image_extractor.extract_images(pdf_path_obj)
+                    logger.info(f"✓ Extracted {len(pdf_images)} images from PDF")
+                    
+                    filtered_images = image_extractor.filter_images(pdf_images)
+                    logger.info(f"✓ Filtered to {len(filtered_images)} high-quality images")
+                    
+                    saved_images = image_extractor.save_images(
+                        filtered_images, 
+                        output_path / "extracted_images"
+                    )
+                    logger.info(f"✓ Saved {len(saved_images)} images")
+                else:
+                    logger.info("✓ Skipping PDF image extraction (using Gemini figure analysis instead)")
                 
                 save_checkpoint(output_path, "pdf_extraction", {
                     "pdf_text_pages": pdf_text['page_count'],
@@ -166,8 +177,7 @@ def main(
             # For now, re-extract
             pdf_text = pdf_reader.extract_text(pdf_path_obj)
             pdf_metadata = pdf_reader.extract_metadata(pdf_path_obj)
-            pdf_images = image_extractor.extract_images(pdf_path_obj)
-            saved_images = image_extractor.filter_images(pdf_images)
+            saved_images = []
         
         # STEP 2: Analyze paper with Gemini
         if not last_step or last_step in ["start", "pdf_extraction"]:
@@ -194,22 +204,31 @@ def main(
                 logger.info(f"  - Key Points: {len(paper_analysis.key_points)}")
                 logger.info(f"  - Recommended Slides: {paper_analysis.recommended_slide_count}")
                 
-                # Optionally describe images
-                image_descriptions = {}
-                if describe_images and saved_images:
-                    logger.info("\nGenerating image descriptions...")
-                    try:
-                        image_descriptions = doc_analyzer.describe_pdf_images(
-                            saved_images,
-                            limit=min(10, len(saved_images))
-                        )
-                        logger.info(f"✓ Described {len(image_descriptions)} images")
-                    except Exception as e:
-                        logger.warning(f"Image description failed: {e}")
+                # Analyze figures using Gemini's direct PDF analysis (recommended)
+                figure_descriptions = {}
+                if use_gemini_figures:
+                    logger.info("\nAnalyzing figures directly from PDF with Gemini...")
+                    figure_cache_key = f"figures_{pdf_path_obj.stem}"
+                    
+                    if cache and cache.exists(figure_cache_key):
+                        figure_descriptions = cache.get(figure_cache_key)
+                        logger.info(f"✓ Retrieved {len(figure_descriptions)} figure descriptions from cache")
+                    else:
+                        try:
+                            figure_descriptions = doc_analyzer.analyze_figures_from_pdf(pdf_path_obj)
+                            if cache:
+                                cache.set(figure_cache_key, figure_descriptions)
+                            logger.info(f"✓ Analyzed {len(figure_descriptions)} figures/tables")
+                        except Exception as e:
+                            logger.warning(f"Figure analysis failed: {e}")
+                            figure_descriptions = {}
+                else:
+                    logger.info("✓ Skipping Gemini figure analysis")
                 
                 save_checkpoint(output_path, "paper_analysis", {
                     "key_points": len(paper_analysis.key_points),
-                    "recommended_slides": paper_analysis.recommended_slide_count
+                    "recommended_slides": paper_analysis.recommended_slide_count,
+                    "figures_analyzed": len(figure_descriptions)
                 })
                 
             except Exception as e:
@@ -217,8 +236,11 @@ def main(
                 raise
         else:
             logger.info("Skipping paper analysis (already completed)")
-            # Would need to load from cache
-            raise NotImplementedError("Resume from this point not yet implemented")
+            # Re-do analysis (should load from checkpoint in full implementation)
+            gemini_client = GeminiClient()
+            doc_analyzer = DocumentAnalyzer(gemini_client)
+            paper_analysis = doc_analyzer.analyze_paper(pdf_path_obj)
+            figure_descriptions = {}
         
         # STEP 3: Create presentation plan
         if not last_step or last_step in ["start", "pdf_extraction", "paper_analysis"]:
@@ -232,7 +254,7 @@ def main(
                     paper_analysis, 
                     pdf_metadata, 
                     saved_images,
-                    image_descriptions if describe_images else None
+                    figure_descriptions  # Pass figure descriptions from Gemini
                 )
                 
                 logger.info(f"✓ Created plan with {presentation_plan.total_slides} slides")
@@ -333,7 +355,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic usage
+  # Basic usage (recommended - uses Gemini figure analysis)
   python scripts/generate_slides.py --pdf paper.pdf --output output/
   
   # Disable caching
@@ -342,8 +364,8 @@ Examples:
   # Resume after interruption
   python scripts/generate_slides.py --pdf paper.pdf --output output/ --resume
   
-  # Skip image descriptions (faster)
-  python scripts/generate_slides.py --pdf paper.pdf --output output/ --no-describe-images
+  # Use old PDF image extraction method (not recommended)
+  python scripts/generate_slides.py --pdf paper.pdf --output output/ --extract-images
 """
     )
     
@@ -368,9 +390,16 @@ Examples:
         help="Resume from last checkpoint if available"
     )
     parser.add_argument(
-        "--no-describe-images",
+        "--extract-images",
         action="store_true",
-        help="Skip generating descriptions for PDF images (faster but less accurate matching)"
+        default=False,
+        help="Extract images from PDF (not recommended for academic papers with vector graphics)"
+    )
+    parser.add_argument(
+        "--use-gemini-figures",
+        action="store_true",
+        default=True,
+        help="Use Gemini's direct PDF figure analysis instead of extraction (recommended, default)"
     )
     
     args = parser.parse_args()
@@ -380,5 +409,6 @@ Examples:
         args.output, 
         use_cache=not args.no_cache,
         resume=args.resume,
-        describe_images=not args.no_describe_images
+        extract_pdf_images=args.extract_images,
+        use_gemini_figures=args.use_gemini_figures
     )

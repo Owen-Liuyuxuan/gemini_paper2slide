@@ -592,6 +592,7 @@ Focus on objective visual characteristics rather than content.
         self,
         prompt: str,
         response_schema: type[BaseModel],
+        pdf_path: Optional[Path] = None,
         model: Optional[str] = None,
         tools: Optional[List[Dict[str, Any]]] = None
     ) -> BaseModel:
@@ -599,10 +600,12 @@ Focus on objective visual characteristics rather than content.
         Generate structured output using JSON schema validation.
         
         Uses Pydantic models to ensure type-safe responses.
+        Optionally processes a PDF file as part of the input.
         
         Args:
             prompt: Input prompt
             response_schema: Pydantic model class for response structure
+            pdf_path: Optional PDF file to analyze along with the prompt
             model: Model name (overrides default)
             tools: Optional tools to enable (e.g., google_search, url_context)
         
@@ -624,7 +627,8 @@ Focus on objective visual characteristics rather than content.
             >>> client = GeminiClient()
             >>> summary = client.generate_structured_output(
             ...     prompt="Analyze this paper and extract key information",
-            ...     response_schema=PaperSummary
+            ...     response_schema=PaperSummary,
+            ...     pdf_path=Path("paper.pdf")
             ... )
             >>> print(summary.title)
         """
@@ -633,6 +637,15 @@ Focus on objective visual characteristics rather than content.
         model_name = model or self.model_text
         
         try:
+            # Build content - can include PDF if provided
+            if pdf_path:
+                logger.debug(f"Including PDF in structured output: {pdf_path}")
+                # Upload PDF file first
+                file_ref = self.client.files.upload(path=str(pdf_path))
+                content = [file_ref, prompt]
+            else:
+                content = prompt
+            
             config = {
                 "response_mime_type": "application/json",
                 "response_json_schema": response_schema.model_json_schema(),
@@ -643,7 +656,7 @@ Focus on objective visual characteristics rather than content.
             
             response = self.client.models.generate_content(
                 model=model_name,
-                contents=prompt,
+                contents=content,
                 config=config
             )
             
