@@ -1,8 +1,47 @@
-Based on the paper analysis, create a presentation plan with:
-1. Recommended number of slides (typically 8-12)
-2. Content allocation for each slide
-3. Visual style recommendations
-4. Key messages for each slide
+Create a comprehensive presentation plan for the following academic paper:
 
-Paper Analysis:
-{analysis}
+**Paper Information:**
+- Title: {title}
+- Authors: {authors}
+- Page Count: {page_count}
+- Abstract: {abstract}...
+
+**Analysis Summary:**
+- Research Question: {research_question}
+- Methodology: {methodology}...
+- Key Contributions: {key_contributions}
+- Visual Theme: {visual_theme}
+- Recommended Slides: {recommended_slide_count}
+
+**Key Points to Cover:**
+{key_points}
+
+**Available Figures:**
+{figures}
+
+**Task:**
+Create a detailed presentation plan that:
+
+1. **Structure**: Design a logical flow from introduction to conclusion
+2. **Slides**: For each slide, specify:
+   - Slide type: "title", "agenda", "content", "figure", or "conclusion"
+   - Title: Clear, descriptive title
+   - Key points: 3-5 bullet points or main messages
+   - Visual suggestions: What visual elements to include
+   - Related figures: Which PDF figures (by page number) to incorporate
+
+3. **Style**: Define a cohesive visual style that:
+   - Matches the research topic ({visual_theme})
+   - Is professional and academic
+   - Maintains consistency across all slides
+
+4. **Flow**: Ensure the presentation tells a compelling story
+
+**Requirements:**
+- Total slides: {recommended_slide_count} (±2 is acceptable)
+- Include: 1 title slide, content slides, 1 conclusion slide
+- Optional: 1 agenda/outline slide if beneficial
+- Distribute content evenly across slides
+- Match important figures to relevant content
+
+Provide the plan in JSON format matching the PresentationPlanSchema.
