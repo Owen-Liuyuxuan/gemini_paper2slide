@@ -339,42 +339,10 @@ class GeminiClient:
         """
         logger.info(f"Generating image with prompt: {prompt[:100]}...")
         
-        model_name = model or self.model_image
-        
         try:
-            # Prepare content parts
-            content_parts = []
-            
-            # Mode 2: Image-to-Image editing
-            # Base image is passed as CONTENT (for editing)
-            if base_image:
-                logger.debug("Image-to-Image mode: editing base image")
-                
-                if isinstance(base_image, Path):
-                    base_data = base_image.read_bytes()
-                    mime_type = self._get_mime_type(base_image)
-                elif isinstance(base_image, bytes):
-                    base_data = base_image
-                    mime_type = "image/png"
-                elif isinstance(base_image, Image.Image):
-                    buffer = BytesIO()
-                    base_image.save(buffer, format='PNG')
-                    base_data = buffer.getvalue()
-                    mime_type = "image/png"
-                else:
-                    raise ValueError(f"Unsupported base_image type: {type(base_image)}")
-                
-                # Add base image to content
-                content_parts.append(
-                    types.Part.from_bytes(
-                        data=base_data,
-                        mime_type=mime_type,
-                    )
-                )
-            
             # Enhance prompt with style description for consistency
             enhanced_prompt = prompt
-            if style_description and not base_image:
+            if style_description:
                 logger.debug("Enhancing prompt with style description for consistency")
                 enhanced_prompt = f"""{prompt}
 
@@ -383,34 +351,26 @@ class GeminiClient:
 
 Ensure this slide maintains the same visual style, color scheme, and design language as described above."""
             
-            # Add prompt to content
-            content_parts.append(enhanced_prompt)
+            # Note: base_image parameter is currently not used
+            # Imagen API for simple text-to-image doesn't support reference images directly
+            # Style consistency is achieved through enhanced prompts
             
-            # Prepare ImageConfig
-            # Note: ImageConfig does NOT support reference_images parameter
-            # Style consistency must be achieved through enhanced prompts
-            image_config_params = {
-                "aspect_ratio": aspect_ratio,
-                "image_size": image_size,
-            }
-            
-            # Generate image with configuration
-            response = self.client.models.generate_content(
-                model=model_name,
-                contents=content_parts,
-                config=types.GenerateContentConfig(
-                    image_config=types.ImageConfig(**image_config_params)
+            # Generate image using the correct API (generate_images, not generate_content)
+            response = self.client.models.generate_images(
+                model="imagen-3.0-generate-002",  # Use Imagen model for image generation
+                prompt=enhanced_prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
                 )
             )
             
             # Extract image from response
-            image_parts = [part for part in response.parts if part.inline_data]
+            if not response.generated_images or len(response.generated_images) == 0:
+                raise Exception("No images generated in response")
             
-            if not image_parts:
-                raise Exception("No image generated in response")
-            
-            # Get the first image
-            image = image_parts[0].as_image()
+            # Get the first generated image
+            generated_image = response.generated_images[0]
+            image = generated_image.image  # This is a PIL Image
             
             # Convert to bytes
             buffer = BytesIO()
