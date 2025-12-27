@@ -1,0 +1,8 @@
+Generate a visually appealing title slide for an academic presentation.
+
+Title: {title}
+Authors: {authors}
+Key Theme: {theme}
+
+Style: Modern, professional, academic
+Include: Title, authors, key visual metaphor for the research

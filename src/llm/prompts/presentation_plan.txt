@@ -1,0 +1,8 @@
+Based on the paper analysis, create a presentation plan with:
+1. Recommended number of slides (typically 8-12)
+2. Content allocation for each slide
+3. Visual style recommendations
+4. Key messages for each slide
+
+Paper Analysis:
+{analysis}

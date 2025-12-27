@@ -1,0 +1,36 @@
+{
+  "gemini": {
+    "model_text": "gemini-2.5-flash",
+    "model_image": "gemini-2.5-flash-image",
+    "temperature": 0.7,
+    "max_retries": 3,
+    "retry_delay": 2,
+    "timeout": 120,
+    "api_key": null
+  },
+  "pdf": {
+    "max_pages": 50,
+    "image_quality_threshold": 0.5,
+    "min_image_size": [100, 100],
+    "max_image_size": [4096, 4096],
+    "supported_formats": ["png", "jpg", "jpeg"]
+  },
+  "presentation": {
+    "default_slide_count": 10,
+    "max_slides": 15,
+    "min_slides": 5,
+    "image_format": "png",
+    "image_size": [1920, 1080],
+    "aspect_ratio": "16:9"
+  },
+  "cache": {
+    "enabled": true,
+    "ttl_hours": 24,
+    "cache_dir": ".cache"
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>",
+    "log_dir": "logs"
+  }
+}

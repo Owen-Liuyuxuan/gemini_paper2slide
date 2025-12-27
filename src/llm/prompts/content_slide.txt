@@ -1,0 +1,10 @@
+Generate a presentation slide image with the following content:
+
+Slide Title: {title}
+Main Points: {points}
+Visual Theme: {theme}
+
+Reference Images: Maintain visual consistency with the provided reference slides.
+Extracted Figures: {figure_descriptions}
+
+Style: Clean, professional, suitable for academic presentation

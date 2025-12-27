@@ -1,0 +1,17 @@
+{
+  "style_guidelines": {
+    "color_scheme": "professional",
+    "layout": "modern",
+    "font_style": "clean sans-serif"
+  },
+  "reference_images": {
+    "use_title_as_reference": true,
+    "use_second_as_reference": true,
+    "max_reference_images": 2
+  },
+  "generation_params": {
+    "aspect_ratio": "16:9",
+    "quality": "high",
+    "safety_settings": "default"
+  }
+}
