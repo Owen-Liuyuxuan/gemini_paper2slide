@@ -281,7 +281,7 @@ def main(
             logger.info("This may take several minutes depending on the number of slides...")
             
             try:
-                style_manager = StyleManager()
+                style_manager = StyleManager(gemini_client)
                 image_generator = ImageGenerator(gemini_client)
                 slide_generator = SlideGenerator(image_generator, style_manager)
                 

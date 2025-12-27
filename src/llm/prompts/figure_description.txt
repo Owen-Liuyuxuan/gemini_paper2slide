@@ -1,0 +1,9 @@
+Describe this figure from an academic paper comprehensively:
+
+1. **Type**: What kind of visualization is this? (graph, diagram, photo, chart, equation, table, etc.)
+2. **Content**: What are the main elements, data, or information shown?
+3. **Purpose**: What does it illustrate or demonstrate?
+4. **Key Insights**: What are the key findings or messages conveyed?
+5. **Presentation Value**: How important would this be in a presentation? (High/Medium/Low)
+
+Provide a clear, concise description suitable for determining slide placement.

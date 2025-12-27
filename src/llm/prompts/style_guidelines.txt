@@ -1,0 +1,13 @@
+Visual Style Guidelines:
+- Color Scheme: {color_scheme}
+- Layout: {layout}
+- Font Style: {font_style}
+- Aspect Ratio: {aspect_ratio}
+- Quality: {quality}
+
+Design Principles:
+- Maintain consistency with previous slides
+- Use clean, professional layouts
+- Ensure text is readable and well-spaced
+- Apply color schemes uniformly
+- Use appropriate visual hierarchy

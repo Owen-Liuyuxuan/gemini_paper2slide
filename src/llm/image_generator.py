@@ -117,32 +117,25 @@ class ImageGenerator:
         """
         logger.info(f"Generating content slide {content.index}: {content.title}")
         
-        # Build prompt for content slide
-        base_prompt = f"""
-Generate a professional academic presentation slide with the following content:
-
-**Slide Title**: {content.title}
-
-**Main Points**:
-{self._format_points(content.main_points)}
-
-**Visual Elements**: {content.visual_elements}
-
-**Layout Requirements**:
-- Clear, readable typography
-- Appropriate spacing and margins
-- Professional color scheme
-- Well-organized content
-- Suitable for academic presentation
-"""
+        # Format main points
+        formatted_points = self._format_points(content.main_points)
         
-        # Add notes if present
+        # Build additional context
+        additional_context = ""
         if content.notes:
-            base_prompt += f"\n**Additional Context**: {content.notes}"
+            additional_context += f"**Additional Context**: {content.notes}\n"
         
-        # Add PDF image context if available
         if pdf_images:
-            base_prompt += f"\n**Relevant Figures**: Consider incorporating elements from {len(pdf_images)} related figures from the paper"
+            additional_context += f"**Relevant Figures**: Consider incorporating elements from {len(pdf_images)} related figures from the paper\n"
+        
+        # Load content slide prompt from file and format it
+        base_prompt = self.gemini_client.load_prompt(
+            "content_slide",
+            title=content.title,
+            main_points=formatted_points,
+            visual_elements=content.visual_elements,
+            additional_context=additional_context if additional_context else ""
+        )
         
         # Generate with style consistency (returns PIL Image)
         start_time = time.time()
@@ -224,30 +217,13 @@ Professional academic presentation style with:
         
         authors_str = ", ".join(authors) if isinstance(authors, list) else str(authors)
         
-        prompt = f"""
-Generate a visually appealing title slide for an academic presentation.
-
-**Title**: {title}
-
-**Authors**: {authors_str}
-
-**Theme**: {theme}
-
-**Requirements**:
-- Modern, professional, academic style
-- Clear title prominently displayed
-- Author names clearly visible
-- Incorporate visual metaphor or abstract representation related to: {theme}
-- Professional color scheme
-- Clean typography (sans-serif recommended)
-- Appropriate for academic conference presentation
-
-**Layout**:
-- Title: Large, centered or prominently placed
-- Authors: Below title, medium size
-- Optional: Subtle background design or academic imagery
-- Ensure excellent readability
-"""
+        # Load title slide prompt from file and format it
+        prompt = self.gemini_client.load_prompt(
+            "title_slide",
+            title=title,
+            authors=authors_str,
+            theme=theme
+        )
         
         return prompt
     

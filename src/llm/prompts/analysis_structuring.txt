@@ -1,0 +1,20 @@
+Based on the following paper analysis, extract structured information in JSON format.
+
+ANALYSIS:
+{analysis_text}
+
+Extract and structure the following information:
+1. summary: Overall summary (string)
+2. research_question: Main research question (string)
+3. methodology: Research methodology description (string)
+4. key_contributions: List of key contributions (list of strings, 3-5 items)
+5. key_points: List of key points for presentation (list of objects), each with:
+   - title: Brief title (string)
+   - content: Detailed content (string)
+   - importance: Importance score 0.0-1.0 (float)
+   - section: Source section (string)
+   - related_figure_pages: Page numbers of related figures (list of integers)
+6. recommended_slide_count: Recommended number of slides 5-20 (integer)
+7. visual_theme: Suggested visual theme (string)
+
+Ensure the output is valid JSON matching the schema.

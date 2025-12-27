@@ -1,0 +1,18 @@
+{base_prompt}
+
+Please provide a comprehensive analysis focusing on:
+
+1. **Summary**: A clear, concise overview of the paper (2-3 sentences)
+2. **Research Question**: The main research question or objective
+3. **Methodology**: The approach and methods used
+4. **Key Contributions**: The main contributions (3-5 items)
+5. **Key Points**: Detailed points for presentation (5-10 items), each with:
+   - Title (brief, descriptive)
+   - Content (detailed explanation)
+   - Importance (how important for presentation, 0.0-1.0)
+   - Section (which part of paper)
+   - Related figures (page numbers if applicable)
+6. **Recommended Slides**: Suggested number of slides (5-20)
+7. **Visual Theme**: Suggested visual theme for the presentation
+
+Provide detailed analysis suitable for creating an effective academic presentation.

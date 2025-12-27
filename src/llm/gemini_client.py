@@ -398,28 +398,76 @@ class GeminiClient:
             logger.error(f"Image generation failed: {e}")
             raise
     
-    def _load_prompt_template(self, template_name: str) -> str:
+    def _load_prompt_template(self, template_name: str, **kwargs) -> str:
         """
-        Load prompt template from file.
+        Load and format prompt template from file.
+        
+        This is the centralized prompt loading method that all LLM-related
+        modules should use. It ensures all prompts are loaded from files
+        rather than being hard-coded in Python code.
         
         Args:
             template_name: Name of template file (without .txt extension)
+            **kwargs: Optional keyword arguments to format the template
         
         Returns:
-            Template content
+            Formatted template content
+        
+        Raises:
+            FileNotFoundError: If template file not found and no default available
+        
+        Example:
+            >>> client = GeminiClient()
+            >>> prompt = client._load_prompt_template(
+            ...     "title_slide",
+            ...     title="My Research Paper",
+            ...     authors="John Doe, Jane Smith",
+            ...     theme="Machine Learning"
+            ... )
         """
         template_file = Path("src/llm/prompts") / f"{template_name}.txt"
         try:
-            return template_file.read_text()
+            template = template_file.read_text()
+            # Format template if kwargs provided
+            if kwargs:
+                try:
+                    return template.format(**kwargs)
+                except KeyError as e:
+                    logger.warning(f"Missing template variable: {e}, returning unformatted template")
+                    return template
+            return template
         except FileNotFoundError:
-            logger.warning(f"Template {template_file} not found, using default")
-            # Return default for style consistency
-            if template_name == "style_consistency":
-                return """**Style Requirements for Visual Consistency:**
-{style_description}
-
-Ensure this slide maintains the same visual style, color scheme, and design language as described above."""
-            return ""
+            logger.error(f"Template {template_file} not found")
+            raise FileNotFoundError(
+                f"Prompt template '{template_name}.txt' not found in src/llm/prompts/. "
+                "All prompts should be stored as text files, not hard-coded in Python."
+            )
+    
+    def load_prompt(self, template_name: str, **kwargs) -> str:
+        """
+        Public method to load and format prompt templates.
+        
+        This method should be used by other modules (document_analyzer, 
+        image_generator, etc.) to load prompts through the GeminiClient.
+        
+        Args:
+            template_name: Name of template file (without .txt extension)
+            **kwargs: Optional keyword arguments to format the template
+        
+        Returns:
+            Formatted template content
+        
+        Example:
+            >>> from src.llm.gemini_client import GeminiClient
+            >>> client = GeminiClient()
+            >>> prompt = client.load_prompt(
+            ...     "content_slide",
+            ...     title="Introduction",
+            ...     main_points="Point 1\\nPoint 2",
+            ...     visual_elements="Diagram of system architecture"
+            ... )
+        """
+        return self._load_prompt_template(template_name, **kwargs)
     
     def extract_style_from_image(
         self,
@@ -465,18 +513,8 @@ Ensure this slide maintains the same visual style, color scheme, and design lang
             
             model_name = model or self.model_text
             
-            style_extraction_prompt = """
-Analyze this presentation slide image and provide a detailed style description that captures:
-
-1. **Color Scheme**: Primary and secondary colors, background color/gradient
-2. **Typography**: Font style (serif/sans-serif), text color, size hierarchy
-3. **Layout Style**: Alignment, spacing, margins, visual balance
-4. **Design Elements**: Any decorative elements, shapes, icons, borders
-5. **Overall Aesthetic**: Modern/traditional, minimalist/detailed, professional/creative
-
-Provide a concise but comprehensive description (100-150 words) that could be used to maintain visual consistency in subsequent slides.
-Focus on objective visual characteristics rather than content.
-"""
+            # Load style extraction prompt from file
+            style_extraction_prompt = self.load_prompt("style_extraction")
             
             # Generate style description
             response = self.client.models.generate_content(

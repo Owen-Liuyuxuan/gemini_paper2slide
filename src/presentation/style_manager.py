@@ -7,6 +7,7 @@ color schemes, fonts, and layouts.
 
 from typing import Dict
 
+from src.llm.gemini_client import GeminiClient
 from src.utils.config_loader import get_config
 from src.utils.logger import get_logger
 
@@ -21,12 +22,16 @@ class StyleManager:
     color schemes, fonts, and layouts.
     """
     
-    def __init__(self):
+    def __init__(self, gemini_client: GeminiClient = None):
         """
         Initialize style manager.
+        
+        Args:
+            gemini_client: Optional GeminiClient instance for loading prompts
         """
         self.config = get_config("image_generation", {})
         self.style_guidelines = self._load_style_guidelines()
+        self.gemini_client = gemini_client
         self.logger = logger
         
         logger.info("StyleManager initialized")
@@ -40,6 +45,22 @@ class StyleManager:
         """
         guidelines = self.style_guidelines
         
+        # If gemini_client is available, use centralized prompt loading
+        if self.gemini_client:
+            try:
+                style_prompt = self.gemini_client.load_prompt(
+                    "style_guidelines",
+                    color_scheme=guidelines.get('color_scheme', 'professional'),
+                    layout=guidelines.get('layout', 'modern'),
+                    font_style=guidelines.get('font_style', 'clean sans-serif'),
+                    aspect_ratio=guidelines.get('aspect_ratio', '16:9'),
+                    quality=guidelines.get('quality', 'high')
+                )
+                return style_prompt
+            except FileNotFoundError:
+                logger.warning("Style guidelines prompt file not found, using fallback")
+        
+        # Fallback: construct prompt inline (legacy support)
         style_prompt = f"""
         Visual Style Guidelines:
         - Color Scheme: {guidelines.get('color_scheme', 'professional')}

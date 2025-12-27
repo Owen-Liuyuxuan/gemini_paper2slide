@@ -1,8 +1,22 @@
 Generate a visually appealing title slide for an academic presentation.
 
-Title: {title}
-Authors: {authors}
-Key Theme: {theme}
+**Title**: {title}
 
-Style: Modern, professional, academic
-Include: Title, authors, key visual metaphor for the research
+**Authors**: {authors}
+
+**Theme**: {theme}
+
+**Requirements**:
+- Modern, professional, academic style
+- Clear title prominently displayed
+- Author names clearly visible
+- Incorporate visual metaphor or abstract representation related to: {theme}
+- Professional color scheme
+- Clean typography (sans-serif recommended)
+- Appropriate for academic conference presentation
+
+**Layout**:
+- Title: Large, centered or prominently placed
+- Authors: Below title, medium size
+- Optional: Subtle background design or academic imagery
+- Ensure excellent readability

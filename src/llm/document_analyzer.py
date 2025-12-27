@@ -224,21 +224,14 @@ Importance: {fig.importance:.2f}"""
         important_images.sort(key=lambda x: x[1].quality_score, reverse=True)
         important_images = important_images[:limit]
         
+        # Load figure description prompt from file
+        figure_description_prompt = self.gemini_client.load_prompt("figure_description")
+        
         for idx, img in important_images:
             try:
                 description = self.gemini_client.describe_image(
                     image_path=img.file_path,
-                    prompt="""
-Describe this figure from an academic paper comprehensively:
-
-1. **Type**: What kind of visualization is this? (graph, diagram, photo, chart, equation, table, etc.)
-2. **Content**: What are the main elements, data, or information shown?
-3. **Purpose**: What does it illustrate or demonstrate?
-4. **Key Insights**: What are the key findings or messages conveyed?
-5. **Presentation Value**: How important would this be in a presentation? (High/Medium/Low)
-
-Provide a clear, concise description suitable for determining slide placement.
-"""
+                    prompt=figure_description_prompt
                 )
                 descriptions[idx] = description
                 logger.debug(f"Described image {idx} from page {img.page_num}")
@@ -263,28 +256,13 @@ Provide a clear, concise description suitable for determining slide placement.
             logger.warning(f"Prompt file {prompt_file} not found, using default")
             base_prompt = """Analyze this academic paper comprehensively."""
         
-        # Enhance with structured output instructions
-        enhanced_prompt = f"""{base_prompt}
-
-Please provide a comprehensive analysis focusing on:
-
-1. **Summary**: A clear, concise overview of the paper (2-3 sentences)
-2. **Research Question**: The main research question or objective
-3. **Methodology**: The approach and methods used
-4. **Key Contributions**: The main contributions (3-5 items)
-5. **Key Points**: Detailed points for presentation (5-10 items), each with:
-   - Title (brief, descriptive)
-   - Content (detailed explanation)
-   - Importance (how important for presentation, 0.0-1.0)
-   - Section (which part of paper)
-   - Related figures (page numbers if applicable)
-6. **Recommended Slides**: Suggested number of slides (5-20)
-7. **Visual Theme**: Suggested visual theme for the presentation
-
-Provide detailed analysis suitable for creating an effective academic presentation.
-"""
+        # Load structured analysis enhancement from file
+        structured_template = self.gemini_client.load_prompt(
+            "paper_analysis_structured",
+            base_prompt=base_prompt
+        )
         
-        return enhanced_prompt
+        return structured_template
     
     def _get_figure_analysis_prompt(self) -> str:
         """
@@ -325,28 +303,11 @@ Describe each figure as if explaining to someone who cannot see it.
         """
         logger.debug("Parsing analysis into structured format")
         
-        structure_prompt = f"""
-Based on the following paper analysis, extract structured information in JSON format.
-
-ANALYSIS:
-{analysis_text}
-
-Extract and structure the following information:
-1. summary: Overall summary (string)
-2. research_question: Main research question (string)
-3. methodology: Research methodology description (string)
-4. key_contributions: List of key contributions (list of strings, 3-5 items)
-5. key_points: List of key points for presentation (list of objects), each with:
-   - title: Brief title (string)
-   - content: Detailed content (string)
-   - importance: Importance score 0.0-1.0 (float)
-   - section: Source section (string)
-   - related_figure_pages: Page numbers of related figures (list of integers)
-6. recommended_slide_count: Recommended number of slides 5-20 (integer)
-7. visual_theme: Suggested visual theme (string)
-
-Ensure the output is valid JSON matching the schema.
-"""
+        # Load structuring prompt from file
+        structure_prompt = self.gemini_client.load_prompt(
+            "analysis_structuring",
+            analysis_text=analysis_text
+        )
         
         try:
             structured_analysis = self.gemini_client.generate_structured_output(

@@ -1,10 +1,17 @@
-Generate a presentation slide image with the following content:
+Generate a professional academic presentation slide with the following content:
 
-Slide Title: {title}
-Main Points: {points}
-Visual Theme: {theme}
+**Slide Title**: {title}
 
-Reference Images: Maintain visual consistency with the provided reference slides.
-Extracted Figures: {figure_descriptions}
+**Main Points**:
+{main_points}
 
-Style: Clean, professional, suitable for academic presentation
+**Visual Elements**: {visual_elements}
+
+**Layout Requirements**:
+- Clear, readable typography
+- Appropriate spacing and margins
+- Professional color scheme
+- Well-organized content
+- Suitable for academic presentation
+
+{additional_context}
