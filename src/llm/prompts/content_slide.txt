@@ -1,10 +1,19 @@
-Generate a presentation slide image with the following content:
+We are creating a comprehensive acedemic report of the paper to the professors and PhD students.
 
-Slide Title: {title}
-Main Points: {points}
-Visual Theme: {theme}
+Here, we need to create one of the content page.
 
-Reference Images: Maintain visual consistency with the provided reference slides.
-Extracted Figures: {figure_descriptions}
+## Style Requirements
 
-Style: Clean, professional, suitable for academic presentation
+- The style should match the overall visual theme of the entire page: {paper_analysis.visual_theme}
+- While further, comply with the reference image.
+
+## Visualization Requirements
+
+When we are required to be authentical to the original paper contents, directly use the table/graph/figures in the paper PDF.
+
+## Content Requirements
+
+- Title: {content.title}
+- expected_contents: {main_points}
+
+The detailed visual elements of the current page: {content.visual_elements}

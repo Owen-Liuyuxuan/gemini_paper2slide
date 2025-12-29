@@ -136,8 +136,14 @@ class GeminiClient:
                 config=types.GenerateContentConfig(
                     temperature=temperature or self.temperature,
                     max_output_tokens=max_tokens or 8192,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
                 )
             )
+            
+            # Check if response has text
+            if not response.text:
+                logger.warning("Empty response from API")
+                return ""
             
             text = response.text
             logger.debug(f"Generated {len(text)} characters")
@@ -160,7 +166,6 @@ class GeminiClient:
         pdf_data: Optional[bytes] = None,
         prompt: str = "Analyze this document in detail.",
         model: Optional[str] = None,
-        use_high_resolution: bool = False
     ) -> str:
         """
         Analyze PDF document using Gemini's multimodal capabilities.
@@ -217,48 +222,18 @@ class GeminiClient:
                 )
             ]
             
-            # Add high resolution parameter if requested (v1alpha API)
-            if use_high_resolution:
-                logger.debug("Using high resolution media processing")
-                # Use v1alpha client for high resolution
-                client_alpha = genai.Client(
-                    api_key=self.api_key,
-                    http_options={'api_version': 'v1alpha'}
+            # Standard API
+            parts.append(prompt)
+            
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=parts,
+                config=types.GenerateContentConfig(
+                    temperature=self.temperature,
+                    max_output_tokens=8192,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
                 )
-                
-                response = client_alpha.models.generate_content(
-                    model=model_name,
-                    contents=[
-                        types.Content(
-                            parts=[
-                                types.Part(text=prompt),
-                                types.Part(
-                                    inline_data=types.Blob(
-                                        mime_type="application/pdf",
-                                        data=pdf_data,
-                                    ),
-                                    media_resolution={"level": "media_resolution_high"}
-                                )
-                            ]
-                        )
-                    ],
-                    config=types.GenerateContentConfig(
-                        temperature=self.temperature,
-                        max_output_tokens=8192,
-                    )
-                )
-            else:
-                # Standard API
-                parts.append(prompt)
-                
-                response = self.client.models.generate_content(
-                    model=model_name,
-                    contents=parts,
-                    config=types.GenerateContentConfig(
-                        temperature=self.temperature,
-                        max_output_tokens=8192,
-                    )
-                )
+            )
             
             analysis = response.text
             logger.info(f"Document analysis complete: {len(analysis)} characters")
@@ -278,33 +253,35 @@ class GeminiClient:
     def generate_image(
         self,
         prompt: str,
-        reference_images: Optional[List[Union[Path, bytes, Image.Image]]] = None,
-        base_image: Optional[Union[Path, bytes, Image.Image]] = None,
+        style_description: Optional[str] = None,
+        base_image: Optional[Union[Path, Image.Image]] = None,
         aspect_ratio: str = "16:9",
         image_size: str = "4K",
         model: Optional[str] = None,
+        pdf_path: Optional[Path] = None,
         save_path: Optional[Path] = None
-    ) -> bytes:
+    ) -> Image.Image:
         """
         Generate image using Gemini's image generation model.
         
-        Supports three modes:
+        Supports two modes:
         1. Text-to-Image: Generate from text prompt only
         2. Image-to-Image: Edit/modify a base image with text prompt
-        3. Style-consistent generation: Use reference images for style consistency
+        
+        For visual consistency across slides, use enhanced prompts with style_description
+        instead of reference images (which are not supported by the API).
         
         Args:
             prompt: Image generation prompt
-            reference_images: List of reference images for STYLE CONSISTENCY
-                             (passed in ImageConfig, not as content)
+            style_description: Optional style description for consistency (extracted from previous slides)
             base_image: Base image for IMAGE EDITING (passed as content)
             aspect_ratio: Image aspect ratio (16:9, 4:3, 1:1, 9:16, etc.)
             image_size: Image size (4K, 1080p, 720p)
-            model: Model name (overrides default)
+            model: Model name (overrides default from config)
             save_path: Optional path to save generated image
         
         Returns:
-            Generated image bytes (PNG format)
+            Generated PIL Image
         
         Raises:
             Exception: If generation fails
@@ -314,129 +291,189 @@ class GeminiClient:
             >>> 
             >>> # Mode 1: Text-to-Image
             >>> image = client.generate_image(
-            ...     prompt="Modern academic presentation title slide"
+            ...     prompt="Modern academic presentation title slide with blue gradient"
             ... )
             >>> 
-            >>> # Mode 2: Image-to-Image (editing)
-            >>> image = client.generate_image(
-            ...     prompt="Add neon lights to this image",
-            ...     base_image=Path("original.png")
-            ... )
-            >>> 
-            >>> # Mode 3: Style-consistent generation with reference images
+            >>> # Mode 1 with style consistency
+            >>> style = "Blue gradient background, white text, clean sans-serif font, minimalist design"
             >>> image = client.generate_image(
             ...     prompt="Content slide about methodology",
-            ...     reference_images=[Path("title.png"), Path("slide2.png")],
+            ...     style_description=style,
             ...     aspect_ratio="16:9"
+            ... )
+            >>> 
+            >>> # Mode 2: Image-to-Image editing
+            >>> image = client.generate_image(
+            ...     prompt="Add emphasis to the title section",
+            ...     base_image=Path("original.png")
             ... )
         """
         logger.info(f"Generating image with prompt: {prompt[:100]}...")
         
+        # Use model from config, not hardcoded
         model_name = model or self.model_image
+
+        image_config = types.ImageConfig(
+            aspect_ratio=aspect_ratio,
+            image_size=image_size
+        )
+
+        if pdf_path:
+            pdf_data = pdf_path.read_bytes()
+            pdf_data = [types.Part.from_bytes(
+                data=pdf_data,
+                mime_type='application/pdf',
+            )]
+        else:
+            pdf_data = []
         
         try:
-            # Prepare content parts
-            content_parts = []
+            # Enhance prompt with style description for consistency
+            enhanced_prompt = prompt
+            if style_description:
+                logger.debug("Enhancing prompt with style description for consistency")
+                # Load style consistency template from file
+                style_template = self._load_prompt_template("style_consistency")
+                style_text = style_template.format(style_description=style_description)
+                enhanced_prompt = f"{prompt}\n\n{style_text}"
             
-            # Mode 2: Image-to-Image editing
-            # Base image is passed as CONTENT (for editing)
-            if base_image:
-                logger.debug("Image-to-Image mode: editing base image")
-                
+            # Generate image with or without base image
+            if base_image is not None:
+                # Mode 2: Image-to-Image (editing)
                 if isinstance(base_image, Path):
-                    base_data = base_image.read_bytes()
-                    mime_type = self._get_mime_type(base_image)
-                elif isinstance(base_image, bytes):
-                    base_data = base_image
-                    mime_type = "image/png"
-                elif isinstance(base_image, Image.Image):
-                    buffer = BytesIO()
-                    base_image.save(buffer, format='PNG')
-                    base_data = buffer.getvalue()
-                    mime_type = "image/png"
-                else:
-                    raise ValueError(f"Unsupported base_image type: {type(base_image)}")
-                
-                # Add base image to content
-                content_parts.append(
-                    types.Part.from_bytes(
-                        data=base_data,
-                        mime_type=mime_type,
+                    base_image = Image.open(base_image)
+                logger.debug("Image-to-Image mode: editing base image")
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=[pdf_data] + [enhanced_prompt, base_image],
+                    config=types.GenerateContentConfig(
+                        image_config=image_config,
+                    )
+                )
+            else:
+                # Mode 1: Text-to-Image (generation)
+                logger.debug("Text-to-Image mode: generating from prompt")
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=[pdf_data] + [enhanced_prompt],
+                    config=types.GenerateContentConfig(
+                        image_config=image_config,
                     )
                 )
             
-            # Add prompt to content
-            content_parts.append(prompt)
-            
-            # Prepare ImageConfig
-            image_config_params = {
-                "aspect_ratio": aspect_ratio,
-                "image_size": image_size,
-            }
-            
-            # Mode 3: Style-consistent generation
-            # Reference images are passed in CONFIG (for style consistency)
-            if reference_images and not base_image:
-                logger.debug(f"Style-consistent mode: using {len(reference_images)} reference images")
-                
-                reference_bytes_list = []
-                for idx, ref in enumerate(reference_images):
-                    if isinstance(ref, Path):
-                        ref_data = ref.read_bytes()
-                    elif isinstance(ref, bytes):
-                        ref_data = ref
-                    elif isinstance(ref, Image.Image):
-                        buffer = BytesIO()
-                        ref.save(buffer, format='PNG')
-                        ref_data = buffer.getvalue()
-                    else:
-                        logger.warning(f"Unsupported reference image type: {type(ref)}")
-                        continue
-                    
-                    reference_bytes_list.append(ref_data)
-                    logger.debug(f"Added reference image {idx + 1}")
-                
-                # Add reference images to ImageConfig
-                if reference_bytes_list:
-                    image_config_params["reference_images"] = reference_bytes_list
-            
-            # Generate image with configuration
-            response = self.client.models.generate_content(
-                model=model_name,
-                contents=content_parts,
-                config=types.GenerateContentConfig(
-                    image_config=types.ImageConfig(**image_config_params)
-                )
-            )
-            
             # Extract image from response
-            image_parts = [part for part in response.parts if part.inline_data]
+            # The image is a special genai class, need to convert to PIL Image
+            output_image = None
+            for part in response.parts:
+                if part.text is not None:
+                    logger.debug(f"Response text: {part.text[:100]}...")
+                elif part.inline_data is not None:
+                    # Convert genai image to PIL Image using image_bytes
+                    output_image = part.as_image()
+                    output_image = Image.open(BytesIO(output_image.image_bytes))
+                    break
             
-            if not image_parts:
+            if output_image is None:
                 raise Exception("No image generated in response")
             
-            # Get the first image
-            image = image_parts[0].as_image()
-            
-            # Convert to bytes
-            buffer = BytesIO()
-            image.save(buffer, format='PNG')
-            image_bytes = buffer.getvalue()
-            
-            logger.info(f"Generated image: {len(image_bytes)} bytes")
+            logger.info(f"Generated image: {output_image.size}")
             
             # Save if path provided
             if save_path:
                 save_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(save_path, 'wb') as f:
-                    f.write(image_bytes)
+                output_image.save(save_path)
                 logger.info(f"Saved image to {save_path}")
             
-            return image_bytes
+            return output_image
             
         except Exception as e:
             logger.error(f"Image generation failed: {e}")
             raise
+    
+    def _load_prompt_template(self, template_name: str) -> str:
+        """
+        Load prompt template from file.
+        
+        Args:
+            template_name: Name of template file (without .txt extension)
+        
+        Returns:
+            Template content
+        """
+        template_file = Path("src/llm/prompts") / f"{template_name}.txt"
+        return template_file.read_text()
+    
+    def extract_style_from_image(
+        self,
+        image_path: Optional[Path] = None,
+        image_data: Optional[bytes] = None,
+        model: Optional[str] = None
+    ) -> str:
+        """
+        Extract style description from an image for use in subsequent generations.
+        
+        This is used to maintain visual consistency across slides by describing
+        the style of the first slide and using that description in prompts for
+        subsequent slides.
+        
+        Args:
+            image_path: Path to image file
+            image_data: Raw image bytes (alternative to image_path)
+            model: Model name (overrides default)
+        
+        Returns:
+            Style description string
+        
+        Example:
+            >>> client = GeminiClient()
+            >>> style = client.extract_style_from_image(
+            ...     image_path=Path("title_slide.png")
+            ... )
+            >>> print(style)
+            "Blue gradient background from dark to light blue, white text in clean sans-serif font..."
+        """
+        if image_path is None and image_data is None:
+            raise ValueError("Either image_path or image_data must be provided")
+        
+        logger.debug("Extracting style description from image")
+        
+        try:
+            # Load image data if path provided
+            if image_path and image_data is None:
+                image_data = image_path.read_bytes()
+                mime_type = self._get_mime_type(image_path)
+            else:
+                mime_type = "image/png"
+            
+            model_name = model or self.model_text
+            
+            style_extraction_prompt = self._load_prompt_template("style_extraction")
+            
+            # Generate style description
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=[
+                    types.Part.from_bytes(
+                        data=image_data,
+                        mime_type=mime_type,
+                    ),
+                    style_extraction_prompt
+                ],
+                config=types.GenerateContentConfig(
+                    temperature=0.3,  # Lower temperature for more consistent descriptions
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
+                )
+            )
+            
+            style_description = response.text
+            logger.debug(f"Extracted style description: {style_description[:100]}...")
+            
+            return style_description
+            
+        except Exception as e:
+            logger.error(f"Style extraction failed: {e}")
+            # Return a default style if extraction fails
+            return "Professional academic presentation style with clean layout and readable typography"
     
     @retry(
         retry=retry_if_exception_type((Exception,)),
@@ -500,6 +537,7 @@ class GeminiClient:
                 ],
                 config=types.GenerateContentConfig(
                     temperature=self.temperature,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
                 )
             )
             
@@ -516,6 +554,7 @@ class GeminiClient:
         self,
         prompt: str,
         response_schema: type[BaseModel],
+        pdf_path: Optional[Path] = None,
         model: Optional[str] = None,
         tools: Optional[List[Dict[str, Any]]] = None
     ) -> BaseModel:
@@ -523,10 +562,12 @@ class GeminiClient:
         Generate structured output using JSON schema validation.
         
         Uses Pydantic models to ensure type-safe responses.
+        Optionally processes a PDF file as part of the input.
         
         Args:
             prompt: Input prompt
             response_schema: Pydantic model class for response structure
+            pdf_path: Optional PDF file to analyze along with the prompt
             model: Model name (overrides default)
             tools: Optional tools to enable (e.g., google_search, url_context)
         
@@ -548,7 +589,8 @@ class GeminiClient:
             >>> client = GeminiClient()
             >>> summary = client.generate_structured_output(
             ...     prompt="Analyze this paper and extract key information",
-            ...     response_schema=PaperSummary
+            ...     response_schema=PaperSummary,
+            ...     pdf_path=Path("paper.pdf")
             ... )
             >>> print(summary.title)
         """
@@ -557,9 +599,19 @@ class GeminiClient:
         model_name = model or self.model_text
         
         try:
+            # Build content - can include PDF if provided
+            if pdf_path:
+                logger.debug(f"Including PDF in structured output: {pdf_path}")
+                # Upload PDF file - accepts path string or file object
+                file_ref = self.client.files.upload(file=str(pdf_path))
+                content = [file_ref, prompt]
+            else:
+                content = prompt
+            
             config = {
                 "response_mime_type": "application/json",
                 "response_json_schema": response_schema.model_json_schema(),
+                "thinking_config": types.ThinkingConfig(thinking_budget=0)
             }
             
             if tools:
@@ -567,7 +619,7 @@ class GeminiClient:
             
             response = self.client.models.generate_content(
                 model=model_name,
-                contents=prompt,
+                contents=content,
                 config=config
             )
             
@@ -582,6 +634,21 @@ class GeminiClient:
             logger.error(f"Structured output generation failed: {e}")
             raise
     
+    def _extract_image_from_response(
+        self, response: types.GenerateContentResponse
+    ) -> Image.Image:
+        """
+        Extract image from response.
+        
+        Args:
+            response: Response from Gemini API
+        """
+        for part in response.parts:
+            if image:= part.as_image():
+                image = Image.open(BytesIO(image.image_bytes))
+        return image
+
+
     def _get_mime_type(self, file_path: Path) -> str:
         """
         Get MIME type from file extension.

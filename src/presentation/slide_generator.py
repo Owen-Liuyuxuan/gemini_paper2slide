@@ -2,15 +2,16 @@
 Coordinate the slide generation workflow.
 
 Orchestrates the entire slide generation process using the image generator
-and maintains reference images for visual consistency.
+with a 3-stage workflow: title → content with style consistency.
 """
 
 from typing import List
 
-from src.llm.image_generator import ImageGenerator
-from src.presentation.style_manager import StyleManager
+from pathlib import Path
+from src.utils.config_loader import get_config
+from src.llm.gemini_client import GeminiClient
 from src.utils.logger import get_logger
-from src.utils.models import ExtractedImage, GeneratedSlide, PresentationPlan
+from src.utils.models import GeneratedSlide, PresentationPlan
 
 logger = get_logger("slide_generator")
 
@@ -19,89 +20,70 @@ class SlideGenerator:
     """
     Coordinate slide generation workflow.
     
-    Manages the entire slide generation process, using reference images
-    to maintain visual consistency across all slides in the presentation.
+    Implements a 3-stage workflow:
+    1. Generate title slide (extract style)
+    2. Generate remaining slides using extracted style for consistency
     """
     
-    def __init__(self, image_generator: ImageGenerator, style_manager: StyleManager):
+    def __init__(self, gemini_client: GeminiClient):
         """
         Initialize slide generator.
         
         Args:
-            image_generator: Initialized ImageGenerator instance
-            style_manager: Initialized StyleManager instance
+            gemini_client: Initialized Gemini Client instance
         """
-        self.image_generator = image_generator
-        self.style_manager = style_manager
+        self.gemini_client = gemini_client
         self.logger = logger
         
-        logger.info("SlideGenerator initialized")
+        logger.info("SlideGenerator initialized with 3-stage workflow")
     
-    def generate_presentation(self, presentation_plan: PresentationPlan) -> List[GeneratedSlide]:
-        """
-        Generate complete presentation from plan.
-        
-        Args:
-            presentation_plan: Complete presentation plan
-        
-        Returns:
-            List of GeneratedSlide objects
-        """
-        logger.info(f"Generating presentation with {presentation_plan.total_slides} slides")
-        
-        slides = []
-        
-        # Generate slides one by one
-        for i, slide_content in enumerate(presentation_plan.slides):
-            logger.info(f"Generating slide {i+1}/{len(presentation_plan.slides)}: {slide_content.title}")
-            
-            # Generate the slide
-            generated_slide = self.image_generator.generate_content_slide(
-                content=slide_content,
-                references=self.image_generator.reference_slides,
-                pdf_images=[]  # Will be filled in generate_slide_sequence
-            )
-            
-            slides.append(generated_slide)
-        
-        logger.info(f"Successfully generated {len(slides)} slides")
-        return slides
-    
-    def generate_slide_sequence(self, plan: PresentationPlan, pdf_images: List[ExtractedImage]) -> List[GeneratedSlide]:
+    def generate_slide_sequence(
+        self, 
+        plan: PresentationPlan, 
+        pdf_path: Path,
+    ) -> List[GeneratedSlide]:
         """
         Generate slides in sequence maintaining visual consistency.
         
+        Implements the proper 3-stage workflow:
+        1. Generate title slide (special handling, extracts style)
+        2. Generate all content slides using extracted style
+        
         Args:
             plan: Presentation plan with slide content
-            pdf_images: List of images extracted from the PDF
         
         Returns:
             List of generated slide images
         """
-        logger.info("Starting sequential slide generation")
+        logger.info(f"Starting 3-stage slide generation for {plan.total_slides} slides")
         
         generated_slides = []
-        
-        # Process each slide in the plan
-        for idx, slide_content in enumerate(plan.slides):
-            logger.debug(f"Processing slide {slide_content.index}: {slide_content.title}")
-            
-            # Get related PDF images for this slide
-            related_images_paths = []
-            for img_idx in slide_content.related_pdf_images:
-                if img_idx < len(pdf_images) and pdf_images[img_idx].file_path:
-                    related_images_paths.append(str(pdf_images[img_idx].file_path))
-            
-            # Generate the slide with reference to previous slides for consistency
-            generated_slide = self.image_generator.generate_content_slide(
-                content=slide_content,
-                references=self.image_generator.reference_slides,  # Use existing references
-                pdf_images=related_images_paths
-            )
-            
-            generated_slides.append(generated_slide)
-            
-            logger.debug(f"Generated slide {slide_content.index}")
-        
-        logger.info(f"Completed sequential generation of {len(generated_slides)} slides")
+
+        output_configuration = get_config("presentation")
+        image_size = output_configuration.get("image_size")
+        aspect_ratio = output_configuration.get("aspect_ratio")
+
+
+        for i, slide in enumerate(plan.slides):
+            if slide.type.value == "title":
+                prompt = self.gemini_client._load_prompt_template("title_slide")
+                prompt = prompt.format(
+                    paper_analysis=plan.analysis,
+                    content=slide,
+                    main_points="\n".join(slide.main_points)
+                )
+                image = self.gemini_client.generate_image(prompt, pdf_path=pdf_path, aspect_ratio=aspect_ratio, image_size=image_size)
+                generated_slides.append(image)
+                logger.info(f"✓ Title slide {slide.index} generated successfully")
+            else:
+                prompt = self.gemini_client._load_prompt_template("content_slide")
+                prompt = prompt.format(
+                    paper_analysis=plan.analysis,
+                    content=slide,
+                    main_points="\n".join(slide.main_points)
+                )
+                image = self.gemini_client.generate_image(prompt, pdf_path=pdf_path, aspect_ratio=aspect_ratio, image_size=image_size, base_image=generated_slides[i-1] if i > 0 else None)
+                generated_slides.append(image)
+                logger.info(f"✓ Content slide {slide.index} generated successfully")
+
         return generated_slides

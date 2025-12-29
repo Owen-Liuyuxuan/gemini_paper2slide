@@ -1,7 +1,7 @@
 {
   "gemini": {
     "model_text": "gemini-2.5-flash",
-    "model_image": "gemini-2.5-flash-image",
+    "model_image": "gemini-3-pro-image-preview",
     "temperature": 0.7,
     "max_retries": 3,
     "retry_delay": 2,
@@ -16,11 +16,8 @@
     "supported_formats": ["png", "jpg", "jpeg"]
   },
   "presentation": {
-    "default_slide_count": 10,
-    "max_slides": 15,
-    "min_slides": 5,
     "image_format": "png",
-    "image_size": [1920, 1080],
+    "image_size": "1K",
     "aspect_ratio": "16:9"
   },
   "cache": {

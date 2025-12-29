@@ -1,8 +1,11 @@
-Generate a visually appealing title slide for an academic presentation.
+We are creating a comprehensive academic report of the paper to the professors and PhD students.
 
-Title: {title}
-Authors: {authors}
-Key Theme: {theme}
+Firstly, we need to create a title page.
 
-Style: Modern, professional, academic
-Include: Title, authors, key visual metaphor for the research
+Title: {content.title}
+type: {content.type}
+expected_contents: {main_points}
+
+The overall visual theme of the entire page: {paper_analysis.visual_theme}
+
+The detailed visual elements of the current title page: {content.visual_elements}

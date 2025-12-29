@@ -7,7 +7,7 @@ Handles saving slide images and organizing them in the output directory.
 import json
 from pathlib import Path
 from typing import List
-
+from PIL import Image
 from src.utils.logger import get_logger
 from src.utils.models import GeneratedSlide, PresentationPlan
 
@@ -33,7 +33,7 @@ class ImageSaver:
         
         logger.info(f"ImageSaver initialized with output directory: {self.output_dir}")
     
-    def save_slides(self, slides: List[GeneratedSlide]) -> None:
+    def save_slides(self, slides: List[Image.Image]) -> None:
         """
         Save all generated slides to disk.
         
@@ -46,18 +46,14 @@ class ImageSaver:
         """
         logger.info(f"Saving {len(slides)} slides to {self.output_dir}")
         
-        for slide in slides:
+        for index, slide in enumerate(slides):
             # Create filename based on slide index
-            filename = f"slide_{slide.index:02d}.{slide.content.type.value}.png"
+            filename = f"slide_{index:02d}.png"
             filepath = self.output_dir / filename
             
             # Save the image
             with open(filepath, 'wb') as f:
-                f.write(slide.image)
-            
-            # Update slide with file path
-            slide.file_path = filepath
-            logger.debug(f"Saved slide {slide.index} to {filepath}")
+                slide.save(f)
         
         logger.info(f"Successfully saved {len(slides)} slides")
     
@@ -103,11 +99,6 @@ class ImageSaver:
                 }
                 for slide in slides
             ],
-            "generation_stats": {
-                "total_slides": len(slides),
-                "total_generation_time": sum(slide.generation_time for slide in slides),
-                "average_generation_time": sum(slide.generation_time for slide in slides) / len(slides) if slides else 0
-            }
         }
         
         # Save metadata to JSON file

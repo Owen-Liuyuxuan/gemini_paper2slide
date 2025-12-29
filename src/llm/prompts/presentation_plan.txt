@@ -1,8 +1,43 @@
-Based on the paper analysis, create a presentation plan with:
-1. Recommended number of slides (typically 8-12)
-2. Content allocation for each slide
-3. Visual style recommendations
-4. Key messages for each slide
+Create a comprehensive presentation plan to create an acedemic report for the paper.
 
-Paper Analysis:
-{analysis}
+Target Audience: PhD Students and professors.
+
+Target: inform and explain the idea of the paper with in-depth mathematical formulation and algorithms.
+
+By reading through the paper, we learn that:
+
+- Summary: {paper_analysis.summary}
+- Core philosophy: {paper_analysis.core_philosophy}
+- mathematical_formulation: {paper_analysis.mathematical_formulation}
+- methodology: {paper_analysis.methodology}
+- key_contributions: {paper_analysis.key_contributions}
+- recommended_slide_count: {paper_analysis.recommended_slide_count}
+- visual_theme: {paper_analysis.visual_theme}
+
+Now, we need to determine
+- How to organize the slides and the presentation contents.
+  - We need to judge from the paper, on whether we should stress in, problem formulation/mathematical details/methods comparisons/new system or component designs/new algorithms/experiments and discussion. And organize the contents for each page.
+  - In general, we need to include a title slide and an ending slide
+
+- The overall visual styles of the report.
+- What to visualize for each slides in detail.
+  - If the slide is a title page/agenda memu/content/conclusion
+  - What is the text contents we would like to have on this slide.
+  - If we decide the create rigid visualization for the current slide. We need to further determine
+    - If we would like to directly use what figure/image/table in the original PDF file. Explicitly state it in the slide content.
+    - If we would like to draw a new images to present the content better, provide the prompt on what to draw and what not to draw, and provide detail visual description on what is the best way to convey the information we would like to express.
+
+Provide the plan in JSON format matching the PresentationPlanSchema.
+{{
+   "slide_count": number_of_slides_to_output,
+   "style_description": "overall presentation style description",
+   "slides": [
+      A list of SlideContent {{
+         "index": slide_index,
+         "type": SlideType "title/agenda/content/figure/conclusion",
+         "title": "slide title",
+         "main_points": ["List of textural contents"],
+         "visual_elements": "Describing the visualization elements in detailed"
+      }}
+   ]
+}}

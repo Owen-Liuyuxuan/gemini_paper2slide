@@ -1,1 +1,4 @@
 *.pyc
+presentations
+logs
+*.pdf
