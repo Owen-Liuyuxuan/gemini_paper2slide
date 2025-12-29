@@ -136,6 +136,7 @@ class GeminiClient:
                 config=types.GenerateContentConfig(
                     temperature=temperature or self.temperature,
                     max_output_tokens=max_tokens or 8192,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
                 )
             )
             
@@ -165,7 +166,6 @@ class GeminiClient:
         pdf_data: Optional[bytes] = None,
         prompt: str = "Analyze this document in detail.",
         model: Optional[str] = None,
-        use_high_resolution: bool = False
     ) -> str:
         """
         Analyze PDF document using Gemini's multimodal capabilities.
@@ -222,48 +222,18 @@ class GeminiClient:
                 )
             ]
             
-            # Add high resolution parameter if requested (v1alpha API)
-            if use_high_resolution:
-                logger.debug("Using high resolution media processing")
-                # Use v1alpha client for high resolution
-                client_alpha = genai.Client(
-                    api_key=self.api_key,
-                    http_options={'api_version': 'v1alpha'}
+            # Standard API
+            parts.append(prompt)
+            
+            response = self.client.models.generate_content(
+                model=model_name,
+                contents=parts,
+                config=types.GenerateContentConfig(
+                    temperature=self.temperature,
+                    max_output_tokens=8192,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
                 )
-                
-                response = client_alpha.models.generate_content(
-                    model=model_name,
-                    contents=[
-                        types.Content(
-                            parts=[
-                                types.Part(text=prompt),
-                                types.Part(
-                                    inline_data=types.Blob(
-                                        mime_type="application/pdf",
-                                        data=pdf_data,
-                                    ),
-                                    media_resolution={"level": "media_resolution_high"}
-                                )
-                            ]
-                        )
-                    ],
-                    config=types.GenerateContentConfig(
-                        temperature=self.temperature,
-                        max_output_tokens=8192,
-                    )
-                )
-            else:
-                # Standard API
-                parts.append(prompt)
-                
-                response = self.client.models.generate_content(
-                    model=model_name,
-                    contents=parts,
-                    config=types.GenerateContentConfig(
-                        temperature=self.temperature,
-                        max_output_tokens=8192,
-                    )
-                )
+            )
             
             analysis = response.text
             logger.info(f"Document analysis complete: {len(analysis)} characters")
@@ -288,6 +258,7 @@ class GeminiClient:
         aspect_ratio: str = "16:9",
         image_size: str = "4K",
         model: Optional[str] = None,
+        pdf_path: Optional[Path] = None,
         save_path: Optional[Path] = None
     ) -> Image.Image:
         """
@@ -341,6 +312,20 @@ class GeminiClient:
         
         # Use model from config, not hardcoded
         model_name = model or self.model_image
+
+        image_config = types.ImageConfig(
+            aspect_ratio=aspect_ratio,
+            image_size=image_size
+        )
+
+        if pdf_path:
+            pdf_data = pdf_path.read_bytes()
+            pdf_data = [types.Part.from_bytes(
+                data=pdf_data,
+                mime_type='application/pdf',
+            )]
+        else:
+            pdf_data = []
         
         try:
             # Enhance prompt with style description for consistency
@@ -360,14 +345,20 @@ class GeminiClient:
                 logger.debug("Image-to-Image mode: editing base image")
                 response = self.client.models.generate_content(
                     model=model_name,
-                    contents=[enhanced_prompt, base_image],
+                    contents=[pdf_data] + [enhanced_prompt, base_image],
+                    config=types.GenerateContentConfig(
+                        image_config=image_config,
+                    )
                 )
             else:
                 # Mode 1: Text-to-Image (generation)
                 logger.debug("Text-to-Image mode: generating from prompt")
                 response = self.client.models.generate_content(
                     model=model_name,
-                    contents=enhanced_prompt,
+                    contents=[pdf_data] + [enhanced_prompt],
+                    config=types.GenerateContentConfig(
+                        image_config=image_config,
+                    )
                 )
             
             # Extract image from response
@@ -378,7 +369,8 @@ class GeminiClient:
                     logger.debug(f"Response text: {part.text[:100]}...")
                 elif part.inline_data is not None:
                     # Convert genai image to PIL Image using image_bytes
-                    output_image = Image.open(BytesIO(part.inline_data.image_bytes))
+                    output_image = part.as_image()
+                    output_image = Image.open(BytesIO(output_image.image_bytes))
                     break
             
             if output_image is None:
@@ -409,17 +401,7 @@ class GeminiClient:
             Template content
         """
         template_file = Path("src/llm/prompts") / f"{template_name}.txt"
-        try:
-            return template_file.read_text()
-        except FileNotFoundError:
-            logger.warning(f"Template {template_file} not found, using default")
-            # Return default for style consistency
-            if template_name == "style_consistency":
-                return """**Style Requirements for Visual Consistency:**
-{style_description}
-
-Ensure this slide maintains the same visual style, color scheme, and design language as described above."""
-            return ""
+        return template_file.read_text()
     
     def extract_style_from_image(
         self,
@@ -465,18 +447,7 @@ Ensure this slide maintains the same visual style, color scheme, and design lang
             
             model_name = model or self.model_text
             
-            style_extraction_prompt = """
-Analyze this presentation slide image and provide a detailed style description that captures:
-
-1. **Color Scheme**: Primary and secondary colors, background color/gradient
-2. **Typography**: Font style (serif/sans-serif), text color, size hierarchy
-3. **Layout Style**: Alignment, spacing, margins, visual balance
-4. **Design Elements**: Any decorative elements, shapes, icons, borders
-5. **Overall Aesthetic**: Modern/traditional, minimalist/detailed, professional/creative
-
-Provide a concise but comprehensive description (100-150 words) that could be used to maintain visual consistency in subsequent slides.
-Focus on objective visual characteristics rather than content.
-"""
+            style_extraction_prompt = self._load_prompt_template("style_extraction")
             
             # Generate style description
             response = self.client.models.generate_content(
@@ -490,6 +461,7 @@ Focus on objective visual characteristics rather than content.
                 ],
                 config=types.GenerateContentConfig(
                     temperature=0.3,  # Lower temperature for more consistent descriptions
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
                 )
             )
             
@@ -565,6 +537,7 @@ Focus on objective visual characteristics rather than content.
                 ],
                 config=types.GenerateContentConfig(
                     temperature=self.temperature,
+                    thinking_config=types.ThinkingConfig(thinking_budget=0)
                 )
             )
             
@@ -638,6 +611,7 @@ Focus on objective visual characteristics rather than content.
             config = {
                 "response_mime_type": "application/json",
                 "response_json_schema": response_schema.model_json_schema(),
+                "thinking_config": types.ThinkingConfig(thinking_budget=0)
             }
             
             if tools:
@@ -660,6 +634,21 @@ Focus on objective visual characteristics rather than content.
             logger.error(f"Structured output generation failed: {e}")
             raise
     
+    def _extract_image_from_response(
+        self, response: types.GenerateContentResponse
+    ) -> Image.Image:
+        """
+        Extract image from response.
+        
+        Args:
+            response: Response from Gemini API
+        """
+        for part in response.parts:
+            if image:= part.as_image():
+                image = Image.open(BytesIO(image.image_bytes))
+        return image
+
+
     def _get_mime_type(self, file_path: Path) -> str:
         """
         Get MIME type from file extension.

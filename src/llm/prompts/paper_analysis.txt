@@ -1,13 +1,27 @@
-Analyze this academic paper comprehensively. Focus on:
-1. Main research question and motivation
-2. Key methodology and approach
-3. Main results and contributions
-4. Important figures, tables, and their significance (describe what they show visually)
-5. Potential visual representations for a presentation
+Before creating a comprehensive academic report of the paper to the professors. 
+We need to read the paper carefully and understand the paper throughroughly.
 
-For each important figure or table you identify:
-- Note which page it appears on
-- Describe what it shows visually
-- Explain its significance to the research
+Analyze the paper comprehensively.
 
-Provide a structured analysis suitable for creating a presentation.
+- Understand the core philosophy of the paper, understand how the author come up with this paper.
+- Understand clearly the mathematical formulation of the existing system question and how the author improve upon it.
+- Understand the algorithm and workflow proposed by the paper that is different from existing works.
+
+Also, we need to consider important points for future visualization
+
+- How many slides are recommended to fully represent the contents to the professors and PhD students with enough details.
+- What color style, what visual themes are compatible to the acedemic presentation for this paper and make reading easy. 
+
+RESPONSE FORMAT:
+Provide your evaluation in the following JSON format only:
+{{
+  "summary": "overall summary of the paper",
+  "core_philosophy": "The current state of the research problem, the motivation to discover the improvement and the overall workflow of the work",
+  "mathematical_formulation": "the mathematical representation of the problems and existing solutions, and the advancement it made"
+  "methodology": "The proposed algorithms to solve the problem. Provide sufficiently deep explaination from",
+  "key_contributions": [
+    "List of strings indicating the individual contributions of the paper."
+  ],
+  "recommended_slide_count": recommended_number_of_slides_for_representation,
+  "visual_theme": "Describe the suggested visual theme of the presentation slide"
+}}

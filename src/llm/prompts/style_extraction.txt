@@ -1,0 +1,10 @@
+Analyze this presentation slide image and provide a detailed style description that captures:
+
+1. **Color Scheme**: Primary and secondary colors, background color/gradient
+2. **Typography**: Font style (serif/sans-serif), text color, size hierarchy
+3. **Layout Style**: Alignment, spacing, margins, visual balance
+4. **Design Elements**: Any decorative elements, shapes, icons, borders
+5. **Overall Aesthetic**: Modern/traditional, minimalist/detailed, professional/creative
+
+Provide a concise but comprehensive description (100-150 words) that could be used to maintain visual consistency in subsequent slides.
+Focus on objective visual characteristics rather than content.
