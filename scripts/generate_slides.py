@@ -28,29 +28,141 @@ from src.presentation.slide_generator import SlideGenerator
 from src.presentation.style_manager import StyleManager
 from src.utils.cache_manager import CacheManager
 from src.utils.logger import setup_logger
+from src.utils.models import PaperAnalysisSchema, PresentationPlan
 
 
-def save_checkpoint(output_dir: Path, step: str, data: Optional[Dict[str, Any]] = None) -> None:
+def serialize_for_checkpoint(obj: Any) -> Any:
     """
-    Save checkpoint for recovery.
+    Serialize objects to JSON-serializable format for checkpoints.
+    
+    Handles Pydantic models, dicts, lists, and basic types.
+    
+    Args:
+        obj: Object to serialize
+        
+    Returns:
+        JSON-serializable representation
+    """
+    if hasattr(obj, 'model_dump'):
+        # Pydantic v2 model
+        return obj.model_dump()
+    elif hasattr(obj, 'dict'):
+        # Pydantic v1 model
+        return obj.dict()
+    elif isinstance(obj, dict):
+        return {k: serialize_for_checkpoint(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_for_checkpoint(item) for item in obj]
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    elif isinstance(obj, Path):
+        return str(obj)
+    elif hasattr(obj, '__dict__'):
+        return serialize_for_checkpoint(obj.__dict__)
+    else:
+        return str(obj)
+
+
+def save_checkpoint(
+    output_dir: Path, 
+    step: str, 
+    data: Optional[Dict[str, Any]] = None,
+    paper_analysis: Optional[PaperAnalysisSchema] = None,
+    presentation_plan: Optional[PresentationPlan] = None
+) -> None:
+    """
+    Save comprehensive checkpoint with all text results in readable format.
+    
+    Saves both JSON (for programmatic access) and human-readable text files.
     
     Args:
         output_dir: Output directory
         step: Checkpoint step name
-        data: Optional data to save with checkpoint
+        data: Optional additional data to save
+        paper_analysis: Paper analysis results (if available)
+        presentation_plan: Presentation plan (if available)
     """
     checkpoint_dir = output_dir / ".checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     
+    # Build comprehensive checkpoint data
     checkpoint_data = {
         "step": step,
         "timestamp": datetime.now().isoformat(),
         "data": data or {}
     }
     
+    # Add paper analysis if provided
+    if paper_analysis:
+        checkpoint_data["paper_analysis"] = serialize_for_checkpoint(paper_analysis)
+    
+    # Add presentation plan if provided
+    if presentation_plan:
+        checkpoint_data["presentation_plan"] = {
+            "analysis": serialize_for_checkpoint(presentation_plan.analysis),
+            "total_slides": presentation_plan.total_slides,
+            "style_guidelines": serialize_for_checkpoint(presentation_plan.style_guidelines),
+            "slides": [
+                {
+                    "index": slide.index,
+                    "type": slide.type.value,
+                    "title": slide.title,
+                    "main_points": slide.main_points,
+                    "visual_elements": slide.visual_elements
+                }
+                for slide in presentation_plan.slides
+            ]
+        }
+    
+    # Save JSON checkpoint
     checkpoint_file = checkpoint_dir / f"{step}.json"
-    with open(checkpoint_file, 'w') as f:
-        json.dump(checkpoint_data, f, indent=2, default=str)
+    with open(checkpoint_file, 'w', encoding='utf-8') as f:
+        json.dump(checkpoint_data, f, indent=2, ensure_ascii=False, default=str)
+    
+    # Save human-readable text checkpoint
+    text_file = checkpoint_dir / f"{step}.txt"
+    with open(text_file, 'w', encoding='utf-8') as f:
+        f.write(f"Checkpoint: {step}\n")
+        f.write(f"Timestamp: {checkpoint_data['timestamp']}\n")
+        f.write("=" * 80 + "\n\n")
+        
+        if paper_analysis:
+            f.write("PAPER ANALYSIS\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"Summary:\n{paper_analysis.summary}\n\n")
+            f.write(f"Core Philosophy:\n{paper_analysis.core_philosophy}\n\n")
+            f.write(f"Mathematical Formulation:\n{paper_analysis.mathematical_formulation}\n\n")
+            f.write(f"Methodology:\n{paper_analysis.methodology}\n\n")
+            f.write(f"Key Contributions:\n")
+            for i, contrib in enumerate(paper_analysis.key_contributions, 1):
+                f.write(f"  {i}. {contrib}\n")
+            f.write(f"\nRecommended Slide Count: {paper_analysis.recommended_slide_count}\n")
+            f.write(f"Visual Theme: {paper_analysis.visual_theme}\n\n")
+            f.write("=" * 80 + "\n\n")
+        
+        if presentation_plan:
+            f.write("PRESENTATION PLAN\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"Total Slides: {presentation_plan.total_slides}\n")
+            f.write(f"Style Guidelines: {presentation_plan.style_guidelines.get('description', 'N/A')}\n\n")
+            
+            f.write("SLIDE SPECIFICATIONS\n")
+            f.write("-" * 80 + "\n")
+            for slide in presentation_plan.slides:
+                f.write(f"\nSlide {slide.index}: {slide.title} ({slide.type.value})\n")
+                f.write(f"Main Points:\n")
+                for i, point in enumerate(slide.main_points, 1):
+                    f.write(f"  {i}. {point}\n")
+                f.write(f"Visual Elements: {slide.visual_elements}\n")
+                f.write("-" * 40 + "\n")
+            f.write("\n" + "=" * 80 + "\n\n")
+        
+        if data:
+            f.write("ADDITIONAL DATA\n")
+            f.write("-" * 80 + "\n")
+            for key, value in data.items():
+                f.write(f"{key}: {value}\n")
+            f.write("\n" + "=" * 80 + "\n")
 
 
 def load_last_checkpoint(output_dir: Path) -> Optional[str]:
@@ -141,9 +253,13 @@ def main(
         logger.info(f"  - Core Idea: {paper_analysis.core_philosophy[:100]}...")
         logger.info(f"  - Recommended Slides: {paper_analysis.recommended_slide_count}")
         
-        save_checkpoint(output_path, "paper_analysis", {
-            "summary": paper_analysis.summary,
-        })
+        save_checkpoint(
+            output_path, 
+            "paper_analysis", 
+            data={"recommended_slide_count": paper_analysis.recommended_slide_count},
+            paper_analysis=paper_analysis
+        )
+        logger.info(f"✓ Checkpoint saved: paper_analysis (JSON + readable text)")
         
     except Exception as e:
         logger.error(f"Paper analysis failed: {e}", exc_info=True)
@@ -167,9 +283,14 @@ def main(
         if presentation_plan.total_slides > 3:
             logger.info(f"  ... and {presentation_plan.total_slides - 3} more slides")
         
-        save_checkpoint(output_path, "presentation_planning", {
-            "total_slides": presentation_plan.total_slides
-        })
+        save_checkpoint(
+            output_path, 
+            "presentation_planning",
+            data={"total_slides": presentation_plan.total_slides},
+            paper_analysis=paper_analysis,
+            presentation_plan=presentation_plan
+        )
+        logger.info(f"✓ Checkpoint saved: presentation_planning (JSON + readable text)")
         
     except Exception as e:
         logger.error(f"Presentation planning failed: {e}", exc_info=True)
@@ -190,9 +311,28 @@ def main(
     
     logger.info(f"✓ Generated {len(slides)} slides")
     
-    save_checkpoint(output_path, "slide_generation", {
-        "slides_generated": len(slides)
-    })
+    # Save slide content information in checkpoint
+    slide_info = []
+    for i, (slide_img, slide_spec) in enumerate(zip(slides, presentation_plan.slides)):
+        slide_info.append({
+            "index": slide_spec.index,
+            "type": slide_spec.type.value,
+            "title": slide_spec.title,
+            "main_points": slide_spec.main_points,
+            "visual_elements": slide_spec.visual_elements
+        })
+    
+    save_checkpoint(
+        output_path, 
+        "slide_generation",
+        data={
+            "slides_generated": len(slides),
+            "slide_info": slide_info
+        },
+        paper_analysis=paper_analysis,
+        presentation_plan=presentation_plan
+    )
+    logger.info(f"✓ Checkpoint saved: slide_generation (JSON + readable text)")
 
     # STEP 5: Save outputs
     logger.info("\n" + "="*80)
@@ -201,16 +341,29 @@ def main(
     
     try:
         image_saver = ImageSaver(output_dir)
-        image_saver.save_slides(slides)
+        slide_paths = image_saver.save_slides(slides)
         logger.info(f"✓ Saved {len(slides)} slide images")
+        
+        # Merge slides into PDF
+        pdf_path = image_saver.merge_slides_to_pdf(slide_paths=slide_paths)
+        logger.info(f"✓ Merged slides into PDF: {pdf_path.name}")
         
         #image_saver.save_metadata(presentation_plan, slides)
         logger.info("✓ Saved presentation metadata")
         
-        save_checkpoint(output_path, "complete", {
-            "total_slides": len(slides),
-            "output_directory": str(output_path)
-        })
+        save_checkpoint(
+            output_path, 
+            "complete",
+            data={
+                "total_slides": len(slides),
+                "output_directory": str(output_path),
+                "slide_files": [f"slide_{i:02d}.png" for i in range(len(slides))],
+                "pdf_file": pdf_path.name
+            },
+            paper_analysis=paper_analysis,
+            presentation_plan=presentation_plan
+        )
+        logger.info(f"✓ Final checkpoint saved: complete (JSON + readable text)")
         
     except Exception as e:
         logger.error(f"Saving outputs failed: {e}", exc_info=True)
@@ -222,8 +375,10 @@ def main(
     logger.info("="*80)
     logger.info(f"Successfully generated {len(slides)} slides")
     logger.info(f"Output directory: {output_path.absolute()}")
-    logger.info(f"Slides: {output_path / 'slide_*.png'}")
+    logger.info(f"Individual slides: {output_path / 'slide_*.png'}")
+    logger.info(f"Combined PDF: {output_path / 'presentation.pdf'}")
     logger.info(f"Metadata: {output_path / 'presentation_metadata.json'}")
+    logger.info(f"Checkpoints: {output_path / '.checkpoints'}")
     logger.info("="*80)
 
 
