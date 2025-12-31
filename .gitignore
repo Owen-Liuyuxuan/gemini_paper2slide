@@ -2,3 +2,7 @@
 presentations
 logs
 *.pdf
+.env
+.cursor
+.cache
+web/outputs

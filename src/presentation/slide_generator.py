@@ -5,13 +5,14 @@ Orchestrates the entire slide generation process using the image generator
 with a 3-stage workflow: title → content with style consistency.
 """
 
-from typing import List
+from typing import List, Optional
 
 from pathlib import Path
 from src.utils.config_loader import get_config
 from src.llm.gemini_client import GeminiClient
 from src.utils.logger import get_logger
 from src.utils.models import GeneratedSlide, PresentationPlan
+from src.utils.progress import ProgressStage, ProgressCallback
 
 logger = get_logger("slide_generator")
 
@@ -41,6 +42,7 @@ class SlideGenerator:
         self, 
         plan: PresentationPlan, 
         pdf_path: Path,
+        progress_callback: Optional[ProgressCallback] = None
     ) -> List[GeneratedSlide]:
         """
         Generate slides in sequence maintaining visual consistency.
@@ -51,11 +53,22 @@ class SlideGenerator:
         
         Args:
             plan: Presentation plan with slide content
+            pdf_path: Path to PDF file
+            progress_callback: Optional callback for progress reporting
         
         Returns:
             List of generated slide images
         """
         logger.info(f"Starting 3-stage slide generation for {plan.total_slides} slides")
+        
+        total_slides = len(plan.slides)
+        
+        if progress_callback:
+            progress_callback(
+                ProgressStage.GENERATING_SLIDES,
+                10,
+                f"Starting slide generation ({total_slides} slides)..."
+            )
         
         generated_slides = []
 
@@ -63,8 +76,25 @@ class SlideGenerator:
         image_size = output_configuration.get("image_size")
         aspect_ratio = output_configuration.get("aspect_ratio")
 
-
         for i, slide in enumerate(plan.slides):
+            # Calculate progress: 10% base + (current_slide / total_slides * 80%)
+            # This gives us 10% to 90% range for slide generation
+            slide_progress = 10 + int((i / total_slides) * 80)
+            
+            if progress_callback:
+                progress_callback(
+                    ProgressStage.GENERATING_SLIDES,
+                    slide_progress,
+                    f"Generating slide {i+1} of {total_slides}: {slide.title}",
+                    details={
+                        "current_slide": i + 1,
+                        "total_slides": total_slides,
+                        "slide_title": slide.title,
+                        "slide_type": slide.type.value,
+                        "slide_index": slide.index
+                    }
+                )
+            
             if slide.type.value == "title":
                 prompt = self.gemini_client._load_prompt_template("title_slide")
                 prompt = prompt.format(
@@ -72,7 +102,12 @@ class SlideGenerator:
                     content=slide,
                     main_points="\n".join(slide.main_points)
                 )
-                image = self.gemini_client.generate_image(prompt, pdf_path=pdf_path, aspect_ratio=aspect_ratio, image_size=image_size)
+                image = self.gemini_client.generate_image(
+                    prompt, 
+                    pdf_path=pdf_path, 
+                    aspect_ratio=aspect_ratio, 
+                    image_size=image_size
+                )
                 generated_slides.append(image)
                 logger.info(f"✓ Title slide {slide.index} generated successfully")
             else:
@@ -82,8 +117,35 @@ class SlideGenerator:
                     content=slide,
                     main_points="\n".join(slide.main_points)
                 )
-                image = self.gemini_client.generate_image(prompt, pdf_path=pdf_path, aspect_ratio=aspect_ratio, image_size=image_size, base_image=generated_slides[i-1] if i > 0 else None)
+                image = self.gemini_client.generate_image(
+                    prompt, 
+                    pdf_path=pdf_path, 
+                    aspect_ratio=aspect_ratio, 
+                    image_size=image_size, 
+                    base_image=generated_slides[i-1] if i > 0 else None
+                )
                 generated_slides.append(image)
                 logger.info(f"✓ Content slide {slide.index} generated successfully")
+            
+            # Report completion of this slide
+            if progress_callback:
+                completed_progress = 10 + int(((i + 1) / total_slides) * 80)
+                progress_callback(
+                    ProgressStage.GENERATING_SLIDES,
+                    completed_progress,
+                    f"Completed slide {i+1} of {total_slides}",
+                    details={
+                        "current_slide": i + 1,
+                        "total_slides": total_slides,
+                        "completed": True
+                    }
+                )
+
+        if progress_callback:
+            progress_callback(
+                ProgressStage.GENERATING_SLIDES,
+                90,
+                f"All {total_slides} slides generated successfully"
+            )
 
         return generated_slides

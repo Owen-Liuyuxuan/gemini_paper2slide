@@ -29,6 +29,7 @@ from src.presentation.style_manager import StyleManager
 from src.utils.cache_manager import CacheManager
 from src.utils.logger import setup_logger
 from src.utils.models import PaperAnalysisSchema, PresentationPlan
+from src.utils.progress import ProgressStage, ProgressCallback, create_noop_callback
 
 
 def serialize_for_checkpoint(obj: Any) -> Any:
@@ -192,6 +193,7 @@ def main(
     output_dir: str, 
     use_cache: bool = True, 
     resume: bool = False,
+    progress_callback: ProgressCallback = None,
 ) -> None:
     """
     Main workflow for generating presentation slides.
@@ -201,13 +203,15 @@ def main(
         output_dir: Directory for output slides
         use_cache: Whether to use cached intermediate results
         resume: Whether to resume from last checkpoint
-        use_gemini_figures: Whether to use Gemini's direct figure analysis (recommended)
-        resume: Whether to resume from last checkpoint
-        describe_images: Whether to generate descriptions for PDF images
+        progress_callback: Optional callback for progress reporting
     """
     logger = setup_logger(__name__)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Use no-op callback if none provided (backward compatibility)
+    if progress_callback is None:
+        progress_callback = create_noop_callback()
 
     logger.info("="*80)
     logger.info(f"Starting slide generation for: {pdf_path}")
@@ -244,8 +248,13 @@ def main(
         if cache and cache.exists(cache_key):
             paper_analysis = cache.get(cache_key)
             logger.info("✓ Retrieved analysis from cache")
+            # Still report progress even for cached results
+            progress_callback(ProgressStage.ANALYZING, 100, "Retrieved analysis from cache")
         else:
-            paper_analysis = doc_analyzer.analyze_paper(pdf_path_obj)
+            paper_analysis = doc_analyzer.analyze_paper(
+                pdf_path_obj,
+                progress_callback=progress_callback
+            )
             if cache:
                 cache.set(cache_key, paper_analysis)
             logger.info("✓ Paper analysis complete")
@@ -274,7 +283,8 @@ def main(
         presentation_planner = PresentationPlanner(gemini_client)
         presentation_plan = presentation_planner.create_plan(
             paper_analysis, 
-            pdf_path_obj
+            pdf_path_obj,
+            progress_callback=progress_callback
         )
         
         logger.info(f"✓ Created plan with {presentation_plan.total_slides} slides")
@@ -306,7 +316,8 @@ def main(
     print(presentation_plan)
     slides = slide_generator.generate_slide_sequence(
         presentation_plan, 
-        pdf_path_obj
+        pdf_path_obj,
+        progress_callback=progress_callback
     )
     
     logger.info(f"✓ Generated {len(slides)} slides")
@@ -340,13 +351,17 @@ def main(
     logger.info("="*80)
     
     try:
+        progress_callback(ProgressStage.SAVING, 90, "Saving slides to disk...")
         image_saver = ImageSaver(output_dir)
         slide_paths = image_saver.save_slides(slides)
         logger.info(f"✓ Saved {len(slides)} slide images")
         
+        progress_callback(ProgressStage.SAVING, 95, "Merging slides into PDF...")
         # Merge slides into PDF
         pdf_path = image_saver.merge_slides_to_pdf(slide_paths=slide_paths)
         logger.info(f"✓ Merged slides into PDF: {pdf_path.name}")
+        
+        progress_callback(ProgressStage.COMPLETE, 100, f"Successfully generated {len(slides)} slides!")
         
         #image_saver.save_metadata(presentation_plan, slides)
         logger.info("✓ Saved presentation metadata")

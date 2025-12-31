@@ -617,21 +617,33 @@ class GeminiClient:
             if tools:
                 config["tools"] = tools
             
-            response = self.client.models.generate_content(
-                model=model_name,
-                contents=content,
-                config=config
-            )
+            logger.debug(f"Calling Gemini API with model: {model_name}")
+            logger.debug(f"Content type: {type(content)}, PDF path: {pdf_path}")
+            
+            try:
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=content,
+                    config=config
+                )
+                logger.debug("Received response from Gemini API")
+            except Exception as api_error:
+                logger.error(f"Gemini API call failed: {api_error}", exc_info=True)
+                raise RuntimeError(f"Failed to generate content from Gemini API: {str(api_error)}") from api_error
             
             # Validate and parse response
-            result = response_schema.model_validate_json(response.text)
-            
-            logger.info(f"Successfully generated structured output: {response_schema.__name__}")
+            try:
+                result = response_schema.model_validate_json(response.text)
+                logger.info(f"Successfully generated structured output: {response_schema.__name__}")
+            except Exception as parse_error:
+                logger.error(f"Failed to parse structured output: {parse_error}")
+                logger.debug(f"Response text: {response.text[:500]}...")  # Log first 500 chars
+                raise ValueError(f"Failed to parse response as {response_schema.__name__}: {str(parse_error)}") from parse_error
             
             return result
             
         except Exception as e:
-            logger.error(f"Structured output generation failed: {e}")
+            logger.error(f"Structured output generation failed: {e}", exc_info=True)
             raise
     
     def _extract_image_from_response(

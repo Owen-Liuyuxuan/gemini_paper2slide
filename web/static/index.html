@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper to Slide Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .main-wrapper {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .sidebar {
+            width: 320px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .sidebar h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+        
+        .api-key-section {
+            margin-bottom: 20px;
+        }
+        
+        .api-key-label {
+            display: block;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .api-key-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.3s;
+        }
+        
+        .api-key-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .api-key-hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+        
+        .api-key-hint a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .api-key-hint a:hover {
+            text-decoration: underline;
+        }
+        
+        .save-button {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .save-button:hover {
+            background: #5568d3;
+        }
+        
+        .save-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .api-key-status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+        }
+        
+        .api-key-status.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        
+        .api-key-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+        
+        .container {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            background: #f5f5f5;
+            border-color: #764ba2;
+        }
+        
+        .upload-area.dragover {
+            background: #e8e8ff;
+            border-color: #764ba2;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .upload-button {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .upload-button:hover {
+            background: #5568d3;
+        }
+        
+        .progress-container {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .progress-container.active {
+            display: block;
+        }
+        
+        .progress-bar-container {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 30px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .progress-message {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        
+        .stage-indicator {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .slide-progress {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .error.active {
+            display: block;
+        }
+        
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .success.active {
+            display: block;
+        }
+        
+        .download-button {
+            background: #28a745;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .download-button:hover {
+            background: #218838;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 1024px) {
+            .main-wrapper {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                position: relative;
+                top: 0;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container, .sidebar {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-wrapper">
+        <div class="sidebar">
+            <h2>⚙️ Settings</h2>
+            <div class="api-key-section">
+                <label class="api-key-label" for="apiKeyInput">Google API Key</label>
+                <input 
+                    type="password" 
+                    id="apiKeyInput" 
+                    class="api-key-input" 
+                    placeholder="Enter your Google Gemini API key"
+                />
+                <div class="api-key-hint">
+                    Get your API key from 
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>
+                </div>
+                <button class="save-button" id="saveApiKeyButton" onclick="saveApiKey()">
+                    Save API Key
+                </button>
+                <div class="api-key-status" id="apiKeyStatus"></div>
+            </div>
+        </div>
+        
+        <div class="container">
+            <h1>📄 Paper to Slide Generator</h1>
+            <p class="subtitle">Upload a PDF paper to generate presentation slides</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>📎 Drag and drop your PDF here, or</p>
+            <button class="upload-button" onclick="document.getElementById('fileInput').click()">
+                Choose File
+            </button>
+            <input type="file" id="fileInput" accept=".pdf" />
+        </div>
+        
+        <div class="progress-container" id="progressContainer">
+            <div class="stage-indicator" id="stageIndicator">Initializing...</div>
+            <div class="progress-message" id="progressMessage">Starting...</div>
+            <div class="slide-progress" id="slideProgress"></div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+        </div>
+        
+        <div class="error" id="errorMessage"></div>
+        <div class="success" id="successMessage"></div>
+        </div>
+    </div>
+    
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressMessage = document.getElementById('progressMessage');
+        const stageIndicator = document.getElementById('stageIndicator');
+        const slideProgress = document.getElementById('slideProgress');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        
+        let pollInterval = null;
+        let currentJobId = null;
+        let savedApiKey = null;
+        
+        // Load saved API key from localStorage
+        window.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem('google_api_key');
+            if (saved) {
+                document.getElementById('apiKeyInput').value = saved;
+                savedApiKey = saved;
+            }
+        });
+        
+        // Save API key function
+        function saveApiKey() {
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const apiKey = apiKeyInput.value.trim();
+            const statusDiv = document.getElementById('apiKeyStatus');
+            
+            if (!apiKey) {
+                statusDiv.textContent = 'Please enter an API key';
+                statusDiv.className = 'api-key-status error';
+                return;
+            }
+            
+            // Basic validation (Google API keys typically start with "AIza")
+            if (!apiKey.startsWith('AIza')) {
+                statusDiv.textContent = 'Warning: API key format may be incorrect';
+                statusDiv.className = 'api-key-status error';
+                // Still allow saving, as format might vary
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('google_api_key', apiKey);
+            savedApiKey = apiKey;
+            
+            statusDiv.textContent = 'API key saved successfully!';
+            statusDiv.className = 'api-key-status success';
+            
+            // Clear status after 3 seconds
+            setTimeout(() => {
+                statusDiv.className = 'api-key-status';
+            }, 3000);
+        }
+        
+        // Stage labels
+        const stageLabels = {
+            'analyzing': '🔍 Analyzing Paper',
+            'planning': '📋 Creating Plan',
+            'generating_slides': '🎨 Generating Slides',
+            'saving': '💾 Saving Outputs',
+            'complete': '✅ Complete',
+            'error': '❌ Error'
+        };
+        
+        // File input handler
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        async function handleFile(file) {
+            if (!file.name.endsWith('.pdf')) {
+                showError('Please upload a PDF file');
+                return;
+            }
+            
+            // Check if API key is set
+            if (!savedApiKey) {
+                const apiKeyInput = document.getElementById('apiKeyInput');
+                if (!apiKeyInput.value.trim()) {
+                    showError('Please enter your Google API key in the settings panel first');
+                    return;
+                }
+                // Try to save it
+                saveApiKey();
+                if (!savedApiKey) {
+                    showError('Please enter a valid API key');
+                    return;
+                }
+            }
+            
+            // Reset UI
+            hideError();
+            hideSuccess();
+            progressContainer.classList.add('active');
+            uploadArea.style.display = 'none';
+            
+            // Upload file with API key
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('api_key', savedApiKey);
+            
+            try {
+                const response = await fetch('/api/generate-slides', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+                
+                const data = await response.json();
+                currentJobId = data.job_id;
+                
+                // Start polling for status
+                startPolling(currentJobId);
+                
+            } catch (error) {
+                showError(error.message);
+                progressContainer.classList.remove('active');
+                uploadArea.style.display = 'block';
+            }
+        }
+        
+        function startPolling(jobId) {
+            // Poll immediately, then every 2 seconds
+            pollStatus(jobId);
+            pollInterval = setInterval(() => pollStatus(jobId), 2000);
+        }
+        
+        async function pollStatus(jobId) {
+            try {
+                const response = await fetch(`/api/status/${jobId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to get status');
+                }
+                
+                const status = await response.json();
+                updateProgressUI(status);
+                
+                // Stop polling if complete or error
+                if (status.stage === 'complete' || status.stage === 'error') {
+                    clearInterval(pollInterval);
+                    
+                    if (status.stage === 'complete') {
+                        showSuccess(`Generation complete! ${status.details?.total_slides || ''} slides generated.`);
+                        showDownloadButton(jobId);
+                    } else {
+                        showError(status.error || 'Generation failed');
+                    }
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+                clearInterval(pollInterval);
+                showError('Failed to get status updates');
+            }
+        }
+        
+        function updateProgressUI(status) {
+            // Update progress bar
+            progressBar.style.width = `${status.progress}%`;
+            progressBar.textContent = `${status.progress}%`;
+            
+            // Update message
+            progressMessage.textContent = status.message;
+            
+            // Update stage indicator
+            stageIndicator.textContent = stageLabels[status.stage] || status.stage;
+            
+            // Show per-slide progress if available
+            if (status.details && status.details.current_slide) {
+                let slideText = `Slide ${status.details.current_slide} of ${status.details.total_slides}`;
+                if (status.details.slide_title) {
+                    slideText += `: ${status.details.slide_title}`;
+                }
+                slideProgress.textContent = slideText;
+                slideProgress.style.display = 'block';
+            } else {
+                slideProgress.style.display = 'none';
+            }
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('active');
+        }
+        
+        function hideError() {
+            errorMessage.classList.remove('active');
+        }
+        
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.classList.add('active');
+        }
+        
+        function hideSuccess() {
+            successMessage.classList.remove('active');
+        }
+        
+        function showDownloadButton(jobId) {
+            const downloadDiv = document.createElement('div');
+            downloadDiv.innerHTML = `
+                <a href="/api/results/${jobId}" class="download-button" download>
+                    📥 Download PDF
+                </a>
+            `;
+            successMessage.appendChild(downloadDiv);
+        }
+    </script>
+</body>
+</html>
+
