@@ -275,8 +275,6 @@ paper2slide/
 │   ├── presentation/      # Slide generation
 │   ├── output/            # File saving
 │   └── utils/             # Utilities
-├── scripts/               # CLI scripts
-│   └── setup_pre_commit.sh  # Pre-commit setup script
 ├── config/                # Configuration files
 ├── pyproject.toml        # Project configuration and dependencies
 ├── .pre-commit-config.yaml  # Pre-commit hooks configuration
@@ -320,71 +318,6 @@ uv run black .
 ```
 
 This ensures the correct virtual environment and dependencies are used.
-
-### Pre-commit Hooks
-
-The project uses pre-commit hooks to ensure code quality before commits.
-
-#### Quick Setup
-
-Run the setup script:
-```bash
-bash scripts/setup_pre_commit.sh
-```
-
-Or manually:
-
-1. Install pre-commit (if not already installed):
-```bash
-uv add --dev pre-commit
-```
-
-2. Install the git hooks:
-```bash
-uv run pre-commit install
-```
-
-This will install hooks that run automatically on `git commit`.
-
-#### Manual Execution
-
-To run all hooks manually:
-```bash
-uv run pre-commit run --all-files
-```
-
-To run a specific hook:
-```bash
-uv run pre-commit run black --all-files
-uv run pre-commit run ruff --all-files
-uv run pre-commit run mypy --all-files
-```
-
-#### Hooks Configured
-
-The following hooks are configured:
-
-- **Black**: Code formatting (line length: 100)
-- **Ruff**: Fast Python linter (auto-fixes issues)
-- **Ruff Format**: Code formatting (alternative to black)
-- **MyPy**: Static type checking
-- **General hooks**: Trailing whitespace, end-of-file fixes, YAML/JSON/TOML validation
-
-#### Skipping Hooks
-
-To skip hooks for a specific commit (not recommended):
-```bash
-git commit --no-verify
-```
-
-#### Updating Hooks
-
-To update hook versions:
-```bash
-uv run pre-commit autoupdate
-```
-
-This updates the hook versions in `.pre-commit-config.yaml`.
 
 ## Contributing
 
