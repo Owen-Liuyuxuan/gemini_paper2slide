@@ -1,4 +1,4 @@
-Before creating a comprehensive academic report of the paper to the professors. 
+Before creating a comprehensive academic report of the paper to the professors.
 We need to read the paper carefully and understand the paper throughroughly.
 
 Analyze the paper comprehensively.
@@ -10,7 +10,7 @@ Analyze the paper comprehensively.
 Also, we need to consider important points for future visualization
 
 - How many slides are recommended to fully represent the contents to the professors and PhD students with enough details.
-- What color style, what visual themes are compatible to the acedemic presentation for this paper and make reading easy. 
+- What color style, what visual themes are compatible to the acedemic presentation for this paper and make reading easy.
 
 RESPONSE FORMAT:
 Provide your evaluation in the following JSON format only:

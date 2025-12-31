@@ -6,24 +6,24 @@
       <stop offset="50%" style="stop-color:#1a1a3e;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#0a0e27;stop-opacity:1" />
     </linearGradient>
-    
+
     <linearGradient id="aiGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#4285f4;stop-opacity:0.8" />
       <stop offset="50%" style="stop-color:#6c5ce7;stop-opacity:0.8" />
       <stop offset="100%" style="stop-color:#00d4ff;stop-opacity:0.8" />
     </linearGradient>
-    
+
     <linearGradient id="flowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" style="stop-color:#4285f4;stop-opacity:0.3" />
       <stop offset="50%" style="stop-color:#00d4ff;stop-opacity:0.6" />
       <stop offset="100%" style="stop-color:#4285f4;stop-opacity:0.3" />
     </linearGradient>
-    
+
     <radialGradient id="glowGradient" cx="50%" cy="50%" r="50%">
       <stop offset="0%" style="stop-color:#4285f4;stop-opacity:0.4" />
       <stop offset="100%" style="stop-color:#4285f4;stop-opacity:0" />
     </radialGradient>
-    
+
     <!-- Filters -->
     <filter id="glow">
       <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -32,7 +32,7 @@
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    
+
     <filter id="softGlow">
       <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
       <feMerge>
@@ -41,83 +41,83 @@
       </feMerge>
     </filter>
   </defs>
-  
+
   <!-- Background -->
   <rect width="1200" height="300" fill="url(#bgGradient)"/>
-  
+
   <!-- Subtle grid pattern -->
   <g opacity="0.03">
     <path d="M0,0 L1200,0 L1200,300 L0,300 Z" fill="none" stroke="#4285f4" stroke-width="1"/>
     <line x1="400" y1="0" x2="400" y2="300" stroke="#4285f4" stroke-width="0.5"/>
     <line x1="800" y1="0" x2="800" y2="300" stroke="#4285f4" stroke-width="0.5"/>
   </g>
-  
+
   <!-- LEFT SECTION: Academic Paper -->
   <g id="input-section">
     <!-- Paper document -->
     <rect x="80" y="80" width="180" height="140" rx="4" fill="#f8f9fa" opacity="0.95"/>
     <rect x="85" y="85" width="170" height="130" rx="2" fill="#ffffff"/>
-    
+
     <!-- Paper content lines -->
     <line x1="100" y1="100" x2="240" y2="100" stroke="#1a1a2e" stroke-width="2" opacity="0.8"/>
     <line x1="100" y1="115" x2="240" y2="115" stroke="#1a1a2e" stroke-width="1.5" opacity="0.6"/>
     <line x1="100" y1="125" x2="230" y2="125" stroke="#1a1a2e" stroke-width="1.5" opacity="0.6"/>
     <line x1="100" y1="135" x2="235" y2="135" stroke="#1a1a2e" stroke-width="1.5" opacity="0.6"/>
-    
+
     <!-- Equation/formula representation -->
     <circle cx="120" cy="160" r="3" fill="#6c5ce7" opacity="0.7"/>
     <text x="130" y="165" font-family="serif" font-size="12" fill="#1a1a2e" opacity="0.6">∫ f(x)dx</text>
-    
+
     <!-- More content lines -->
     <line x1="100" y1="175" x2="240" y2="175" stroke="#1a1a2e" stroke-width="1.5" opacity="0.5"/>
     <line x1="100" y1="185" x2="220" y2="185" stroke="#1a1a2e" stroke-width="1.5" opacity="0.5"/>
     <line x1="100" y1="195" x2="235" y2="195" stroke="#1a1a2e" stroke-width="1.5" opacity="0.5"/>
-    
+
     <!-- Research icon (microscope abstract) -->
     <g transform="translate(90, 60)" opacity="0.6">
       <circle cx="8" cy="8" r="6" fill="none" stroke="#6c5ce7" stroke-width="1.5"/>
       <line x1="8" y1="14" x2="8" y2="20" stroke="#6c5ce7" stroke-width="1.5"/>
     </g>
-    
+
     <!-- Paper corner fold -->
     <path d="M 250,80 L 250,95 L 235,95 Z" fill="#e0e0e0" opacity="0.8"/>
   </g>
-  
+
   <!-- CENTER SECTION: AI Transformation -->
   <g id="transformation-section">
     <!-- Central glow -->
     <circle cx="600" cy="150" r="100" fill="url(#glowGradient)" opacity="0.6"/>
-    
+
     <!-- Neural network nodes -->
     <g filter="url(#glow)">
       <!-- Layer 1 (left) -->
       <circle cx="450" cy="100" r="5" fill="#4285f4"/>
       <circle cx="450" cy="150" r="5" fill="#4285f4"/>
       <circle cx="450" cy="200" r="5" fill="#4285f4"/>
-      
+
       <!-- Layer 2 (center-left) -->
       <circle cx="530" cy="80" r="6" fill="#6c5ce7"/>
       <circle cx="530" cy="130" r="6" fill="#00d4ff"/>
       <circle cx="530" cy="170" r="6" fill="#6c5ce7"/>
       <circle cx="530" cy="220" r="6" fill="#00d4ff"/>
-      
+
       <!-- Layer 3 (center) -->
       <circle cx="600" cy="100" r="7" fill="#00d4ff"/>
       <circle cx="600" cy="150" r="8" fill="#4285f4"/>
       <circle cx="600" cy="200" r="7" fill="#00d4ff"/>
-      
+
       <!-- Layer 4 (center-right) -->
       <circle cx="670" cy="80" r="6" fill="#6c5ce7"/>
       <circle cx="670" cy="130" r="6" fill="#00d4ff"/>
       <circle cx="670" cy="170" r="6" fill="#6c5ce7"/>
       <circle cx="670" cy="220" r="6" fill="#00d4ff"/>
-      
+
       <!-- Layer 5 (right) -->
       <circle cx="750" cy="100" r="5" fill="#4285f4"/>
       <circle cx="750" cy="150" r="5" fill="#4285f4"/>
       <circle cx="750" cy="200" r="5" fill="#4285f4"/>
     </g>
-    
+
     <!-- Neural network connections -->
     <g opacity="0.3" stroke-width="1">
       <!-- Layer 1 to 2 -->
@@ -127,7 +127,7 @@
       <line x1="450" y1="150" x2="530" y2="170" stroke="url(#flowGradient)"/>
       <line x1="450" y1="200" x2="530" y2="170" stroke="url(#flowGradient)"/>
       <line x1="450" y1="200" x2="530" y2="220" stroke="url(#flowGradient)"/>
-      
+
       <!-- Layer 2 to 3 -->
       <line x1="530" y1="80" x2="600" y2="100" stroke="url(#flowGradient)"/>
       <line x1="530" y1="130" x2="600" y2="100" stroke="url(#flowGradient)"/>
@@ -135,7 +135,7 @@
       <line x1="530" y1="170" x2="600" y2="150" stroke="url(#flowGradient)"/>
       <line x1="530" y1="170" x2="600" y2="200" stroke="url(#flowGradient)"/>
       <line x1="530" y1="220" x2="600" y2="200" stroke="url(#flowGradient)"/>
-      
+
       <!-- Layer 3 to 4 -->
       <line x1="600" y1="100" x2="670" y2="80" stroke="url(#flowGradient)"/>
       <line x1="600" y1="100" x2="670" y2="130" stroke="url(#flowGradient)"/>
@@ -143,7 +143,7 @@
       <line x1="600" y1="150" x2="670" y2="170" stroke="url(#flowGradient)"/>
       <line x1="600" y1="200" x2="670" y2="170" stroke="url(#flowGradient)"/>
       <line x1="600" y1="200" x2="670" y2="220" stroke="url(#flowGradient)"/>
-      
+
       <!-- Layer 4 to 5 -->
       <line x1="670" y1="80" x2="750" y2="100" stroke="url(#flowGradient)"/>
       <line x1="670" y1="130" x2="750" y2="100" stroke="url(#flowGradient)"/>
@@ -152,7 +152,7 @@
       <line x1="670" y1="170" x2="750" y2="200" stroke="url(#flowGradient)"/>
       <line x1="670" y1="220" x2="750" y2="200" stroke="url(#flowGradient)"/>
     </g>
-    
+
     <!-- Data flow particles -->
     <g filter="url(#softGlow)">
       <circle cx="380" cy="120" r="2" fill="#00d4ff" opacity="0.8"/>
@@ -163,7 +163,7 @@
       <circle cx="710" cy="160" r="2" fill="#6c5ce7" opacity="0.8"/>
       <circle cx="780" cy="130" r="2" fill="#00d4ff" opacity="0.8"/>
     </g>
-    
+
     <!-- Gemini constellation pattern (subtle) -->
     <g opacity="0.2" stroke="#4285f4" stroke-width="0.5" fill="none">
       <line x1="580" y1="60" x2="600" y2="70"/>
@@ -174,7 +174,7 @@
       <circle cx="620" cy="60" r="1.5" fill="#4285f4"/>
       <circle cx="600" cy="90" r="1.5" fill="#4285f4"/>
     </g>
-    
+
     <!-- Sparkles -->
     <g fill="#00d4ff" opacity="0.6">
       <path d="M 520,95 L 522,100 L 520,105 L 518,100 Z"/>
@@ -182,7 +182,7 @@
       <path d="M 600,230 L 602,235 L 600,240 L 598,235 Z"/>
     </g>
   </g>
-  
+
   <!-- Flow arrows -->
   <g opacity="0.4" fill="none" stroke="#4285f4" stroke-width="2">
     <defs>
@@ -193,7 +193,7 @@
     <path d="M 280,150 Q 350,150 400,150" marker-end="url(#arrowhead)"/>
     <path d="M 800,150 Q 850,150 900,150" marker-end="url(#arrowhead)"/>
   </g>
-  
+
   <!-- RIGHT SECTION: Presentation Slides -->
   <g id="output-section">
     <!-- Slide 3 (back) -->
@@ -204,7 +204,7 @@
       <line x1="975" y1="145" x2="1080" y2="145" stroke="#1a1a2e" stroke-width="1" opacity="0.4"/>
       <line x1="975" y1="152" x2="1075" y2="152" stroke="#1a1a2e" stroke-width="1" opacity="0.4"/>
     </g>
-    
+
     <!-- Slide 2 (middle) -->
     <g transform="translate(10, 5)" opacity="0.8">
       <rect x="960" y="120" width="140" height="105" rx="3" fill="#c5cae9"/>
@@ -214,17 +214,17 @@
       <line x1="975" y1="178" x2="1070" y2="178" stroke="#1a1a2e" stroke-width="1" opacity="0.5"/>
       <line x1="975" y1="186" x2="1075" y2="186" stroke="#1a1a2e" stroke-width="1" opacity="0.5"/>
     </g>
-    
+
     <!-- Slide 1 (front) -->
     <rect x="960" y="120" width="140" height="105" rx="3" fill="#4285f4" opacity="0.2"/>
     <rect x="965" y="125" width="130" height="95" rx="2" fill="#ffffff"/>
-    
+
     <!-- Slide content -->
     <line x1="975" y1="140" x2="1070" y2="140" stroke="#1a1a2e" stroke-width="2" opacity="0.7"/>
     <line x1="975" y1="155" x2="1080" y2="155" stroke="#1a1a2e" stroke-width="1.5" opacity="0.5"/>
     <line x1="975" y1="165" x2="1075" y2="165" stroke="#1a1a2e" stroke-width="1.5" opacity="0.5"/>
     <line x1="975" y1="175" x2="1070" y2="175" stroke="#1a1a2e" stroke-width="1.5" opacity="0.5"/>
-    
+
     <!-- Bullet points -->
     <circle cx="978" cy="190" r="2" fill="#4285f4"/>
     <line x1="985" y1="190" x2="1060" y2="190" stroke="#1a1a2e" stroke-width="1" opacity="0.5"/>
@@ -232,11 +232,11 @@
     <line x1="985" y1="200" x2="1070" y2="200" stroke="#1a1a2e" stroke-width="1" opacity="0.5"/>
     <circle cx="978" cy="210" r="2" fill="#4285f4"/>
     <line x1="985" y1="210" x2="1055" y2="210" stroke="#1a1a2e" stroke-width="1" opacity="0.5"/>
-    
+
     <!-- Presentation icon accent -->
     <rect x="1075" y="130" width="15" height="12" rx="1" fill="#6c5ce7" opacity="0.3"/>
   </g>
-  
+
   <!-- Title Text -->
   <g id="title">
     <text x="600" y="45" font-family="'Inter', 'Segoe UI', sans-serif" font-size="32" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="1">
@@ -246,7 +246,7 @@
       AI-POWERED PRESENTATION GENERATION
     </text>
   </g>
-  
+
   <!-- Decorative elements -->
   <g opacity="0.1">
     <circle cx="100" cy="50" r="30" fill="none" stroke="#4285f4" stroke-width="0.5"/>

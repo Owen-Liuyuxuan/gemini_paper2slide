@@ -19,30 +19,18 @@ import uvicorn
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Paper to Slide Generator web server")
-    parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="Host to bind to (default: 127.0.0.1)"
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8000,
-        help="Port to bind to (default: 8000)"
-    )
-    parser.add_argument(
-        "--reload",
-        action="store_true",
-        help="Enable auto-reload for development"
-    )
-    
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to (default: 8000)")
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+
     args = parser.parse_args()
-    
+
     # Change to project root directory to ensure imports work
     import os
+
     original_cwd = os.getcwd()
     os.chdir(project_root)
-    
+
     try:
         # Use absolute import path
         uvicorn.run(
@@ -50,8 +38,7 @@ if __name__ == "__main__":
             host=args.host,
             port=args.port,
             reload=args.reload,
-            reload_dirs=[str(project_root)] if args.reload else None
+            reload_dirs=[str(project_root)] if args.reload else None,
         )
     finally:
         os.chdir(original_cwd)
-
