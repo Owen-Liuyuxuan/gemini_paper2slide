@@ -6,3 +6,4 @@ logs
 .cursor
 .cache
 web/outputs
+*.egg-info
