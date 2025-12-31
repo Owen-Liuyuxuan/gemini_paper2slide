@@ -6,6 +6,8 @@
 
 Convert academic papers (PDF) into presentation slides using Google's Gemini AI.
 
+Example results: [https://github.com/Owen-Liuyuxuan/gemini_paper2slide/wiki/Example-%E2%80%90-Deepseek-OCR-paper]
+
 ## Overview
 
 This project automatically converts academic papers in PDF format into presentation slides. It leverages Google's Gemini API to:
