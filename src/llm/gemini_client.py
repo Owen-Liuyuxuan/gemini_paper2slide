@@ -21,6 +21,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from uvicorn import Config
 
 from src.utils.config_loader import get_config
 from src.utils.logger import get_logger
@@ -313,11 +314,22 @@ class GeminiClient:
         # Use model from config, not hardcoded
         model_name = model or self.model_image
 
+       
         image_config = types.ImageConfig(
             aspect_ratio=aspect_ratio,
             image_size=image_size
         )
-
+        if model_name == "gemini-3-pro-image-preview":
+            # only gemini 3 supports image size and aspect ratio
+            config = types.GenerateContentConfig(
+                image_config = types.ImageConfig(
+                aspect_ratio=aspect_ratio,
+                image_size=image_size
+                )
+            )
+        else:
+            config = types.GenerateContentConfig(
+            )
         if pdf_path:
             pdf_data = pdf_path.read_bytes()
             pdf_data = [types.Part.from_bytes(
@@ -346,9 +358,7 @@ class GeminiClient:
                 response = self.client.models.generate_content(
                     model=model_name,
                     contents=[pdf_data] + [enhanced_prompt, base_image],
-                    config=types.GenerateContentConfig(
-                        image_config=image_config,
-                    )
+                    config=config
                 )
             else:
                 # Mode 1: Text-to-Image (generation)
@@ -356,9 +366,7 @@ class GeminiClient:
                 response = self.client.models.generate_content(
                     model=model_name,
                     contents=[pdf_data] + [enhanced_prompt],
-                    config=types.GenerateContentConfig(
-                        image_config=image_config,
-                    )
+                    config=config
                 )
             
             # Extract image from response
