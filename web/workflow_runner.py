@@ -33,7 +33,8 @@ def run_generation_workflow(
     output_dir: Path,
     status_manager: JobStatusManager,
     use_cache: bool = True,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    model_image: Optional[str] = None
 ) -> None:
     """
     Run the complete slide generation workflow with progress reporting.
@@ -63,8 +64,18 @@ def run_generation_workflow(
         # Initialize output directory
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Initialize components with provided API key
-        gemini_client = GeminiClient(api_key=api_key) if api_key else GeminiClient()
+        # Initialize components with provided API key and model
+        if api_key:
+            if model_image:
+                gemini_client = GeminiClient(api_key=api_key, model_image=model_image)
+            else:
+                gemini_client = GeminiClient(api_key=api_key)
+        else:
+            if model_image:
+                gemini_client = GeminiClient(model_image=model_image)
+            else:
+                gemini_client = GeminiClient()
+        
         cache = CacheManager() if use_cache else None
         
         # STEP 1: Analyze paper

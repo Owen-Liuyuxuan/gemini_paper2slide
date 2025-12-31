@@ -65,28 +65,11 @@ export GOOGLE_API_KEY="your-api-key-here"
 
 ## Usage
 
-### Command Line Interface
-
-Generate slides from a PDF paper:
-```bash
-uv run python scripts/generate_slides.py --pdf path/to/paper.pdf --output output_directory/
-```
-
-To disable caching:
-```bash
-uv run python scripts/generate_slides.py --pdf path/to/paper.pdf --output output_directory/ --no-cache
-```
-
-To resume from a checkpoint:
-```bash
-uv run python scripts/generate_slides.py --pdf path/to/paper.pdf --output output_directory/ --resume
-```
-
-**Note**: `uv run` automatically uses the project's virtual environment, so you don't need to activate it manually.
-
 ### Web Application
 
 The project includes a modern web interface for easy slide generation.
+
+![image](docs/example_image.png)
 
 #### Starting the Web Server
 
@@ -177,6 +160,27 @@ The web application provides detailed progress reporting:
 - **Error Handling**: Clear error messages if generation fails
 
 Progress updates are polled every 2 seconds, providing near real-time feedback.
+
+
+### Command Line Interface
+
+Generate slides from a PDF paper:
+```bash
+uv run python scripts/generate_slides.py --pdf path/to/paper.pdf --output output_directory/
+```
+
+To disable caching:
+```bash
+uv run python scripts/generate_slides.py --pdf path/to/paper.pdf --output output_directory/ --no-cache
+```
+
+To resume from a checkpoint:
+```bash
+uv run python scripts/generate_slides.py --pdf path/to/paper.pdf --output output_directory/ --resume
+```
+
+**Note**: `uv run` automatically uses the project's virtual environment, so you don't need to activate it manually.
+
 
 ## Architecture
 

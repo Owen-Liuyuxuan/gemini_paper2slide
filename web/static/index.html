@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Paper to Slide Generator</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <style>
         * {
             margin: 0;
@@ -125,6 +126,52 @@
             background: #f8d7da;
             color: #721c24;
             display: block;
+        }
+        
+        .config-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .config-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        
+        .config-group {
+            margin-bottom: 15px;
+        }
+        
+        .config-label {
+            display: block;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        
+        .config-select,
+        .config-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .config-select:focus,
+        .config-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .config-hint {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
         }
         
         .container {
@@ -282,6 +329,100 @@
             background: #218838;
         }
         
+        /* Step Tracker */
+        .steps-tracker {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .steps-tracker h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        
+        .step-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .step-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .step-item:last-child {
+            border-bottom: none;
+        }
+        
+        .step-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 12px;
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+        
+        .step-icon.pending {
+            background: #e0e0e0;
+            color: #999;
+        }
+        
+        .step-icon.active {
+            background: #667eea;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        
+        .step-icon.completed {
+            background: #28a745;
+            color: white;
+        }
+        
+        .step-icon.error {
+            background: #dc3545;
+            color: white;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 2px;
+        }
+        
+        .step-description {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .step-progress {
+            font-size: 11px;
+            color: #999;
+            margin-left: 8px;
+        }
+        
         /* Responsive design */
         @media (max-width: 1024px) {
             .main-wrapper {
@@ -331,6 +472,32 @@
                 </button>
                 <div class="api-key-status" id="apiKeyStatus"></div>
             </div>
+            
+            <div class="config-section">
+                <h3>⚙️ Configuration</h3>
+                
+                <div class="config-group">
+                    <label class="config-label" for="imageModelSelect">Image Generation Model</label>
+                    <select id="imageModelSelect" class="config-select">
+                        <option value="gemini-2.5-flash-image">gemini-2.5-flash-image (Fast)</option>
+                        <option value="gemini-3-pro-image-preview">gemini-3-pro-image-preview (High Quality)</option>
+                    </select>
+                    <div class="config-hint">
+                        Fast: Quick generation, good quality<br>
+                        High Quality: Slower, better results
+                    </div>
+                </div>
+                
+                <div class="config-group">
+                    <label class="config-label" for="useCacheCheckbox">
+                        <input type="checkbox" id="useCacheCheckbox" checked style="margin-right: 6px;">
+                        Use Cache
+                    </label>
+                    <div class="config-hint">
+                        Cache intermediate results for faster re-runs
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="container">
@@ -346,6 +513,47 @@
         </div>
         
         <div class="progress-container" id="progressContainer">
+            <div class="steps-tracker">
+                <h3>Workflow Progress</h3>
+                <ul class="step-list" id="stepList">
+                    <li class="step-item">
+                        <div class="step-icon pending" id="stepIcon1">1</div>
+                        <div class="step-content">
+                            <div class="step-title">Analyzing Paper</div>
+                            <div class="step-description">Extracting key information from PDF</div>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-icon pending" id="stepIcon2">2</div>
+                        <div class="step-content">
+                            <div class="step-title">Creating Plan</div>
+                            <div class="step-description">Structuring presentation layout</div>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-icon pending" id="stepIcon3">3</div>
+                        <div class="step-content">
+                            <div class="step-title">Generating Slides</div>
+                            <div class="step-description" id="step3Description">Creating slide images</div>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-icon pending" id="stepIcon4">4</div>
+                        <div class="step-content">
+                            <div class="step-title">Saving Outputs</div>
+                            <div class="step-description">Saving slides and merging PDF</div>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-icon pending" id="stepIcon5">✓</div>
+                        <div class="step-content">
+                            <div class="step-title">Complete</div>
+                            <div class="step-description">Ready to download</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            
             <div class="stage-indicator" id="stageIndicator">Initializing...</div>
             <div class="progress-message" id="progressMessage">Starting...</div>
             <div class="slide-progress" id="slideProgress"></div>
@@ -374,12 +582,33 @@
         let currentJobId = null;
         let savedApiKey = null;
         
-        // Load saved API key from localStorage
+        // Step mapping
+        const stepMap = {
+            'analyzing': 1,
+            'planning': 2,
+            'generating_slides': 3,
+            'saving': 4,
+            'complete': 5,
+            'error': -1
+        };
+        
+        // Load saved settings from localStorage
         window.addEventListener('DOMContentLoaded', () => {
             const saved = localStorage.getItem('google_api_key');
             if (saved) {
                 document.getElementById('apiKeyInput').value = saved;
                 savedApiKey = saved;
+            }
+            
+            // Load saved configuration
+            const savedModel = localStorage.getItem('image_model');
+            if (savedModel) {
+                document.getElementById('imageModelSelect').value = savedModel;
+            }
+            
+            const savedCache = localStorage.getItem('use_cache');
+            if (savedCache !== null) {
+                document.getElementById('useCacheCheckbox').checked = savedCache === 'true';
             }
         });
         
@@ -477,10 +706,37 @@
             progressContainer.classList.add('active');
             uploadArea.style.display = 'none';
             
-            // Upload file with API key
+            // Reset step tracker
+            for (let i = 1; i <= 5; i++) {
+                const stepIcon = document.getElementById(`stepIcon${i}`);
+                if (stepIcon) {
+                    stepIcon.className = 'step-icon pending';
+                    if (i === 5) {
+                        stepIcon.textContent = '✓';
+                    } else {
+                        stepIcon.textContent = i.toString();
+                    }
+                }
+            }
+            const step3Desc = document.getElementById('step3Description');
+            if (step3Desc) {
+                step3Desc.textContent = 'Creating slide images';
+            }
+            
+            // Get configuration
+            const imageModel = document.getElementById('imageModelSelect').value;
+            const useCache = document.getElementById('useCacheCheckbox').checked;
+            
+            // Save configuration to localStorage
+            localStorage.setItem('image_model', imageModel);
+            localStorage.setItem('use_cache', useCache.toString());
+            
+            // Upload file with API key and configuration
             const formData = new FormData();
             formData.append('file', file);
             formData.append('api_key', savedApiKey);
+            formData.append('model_image', imageModel);
+            formData.append('use_cache', useCache.toString());
             
             try {
                 const response = await fetch('/api/generate-slides', {
@@ -551,6 +807,9 @@
             // Update stage indicator
             stageIndicator.textContent = stageLabels[status.stage] || status.stage;
             
+            // Update step tracker
+            updateStepTracker(status.stage, status.progress, status.message, status.details);
+            
             // Show per-slide progress if available
             if (status.details && status.details.current_slide) {
                 let slideText = `Slide ${status.details.current_slide} of ${status.details.total_slides}`;
@@ -561,6 +820,59 @@
                 slideProgress.style.display = 'block';
             } else {
                 slideProgress.style.display = 'none';
+            }
+        }
+        
+        function updateStepTracker(stage, progress, message, details) {
+            const currentStep = stepMap[stage] || 0;
+            
+            // Update all steps
+            for (let i = 1; i <= 5; i++) {
+                const stepIcon = document.getElementById(`stepIcon${i}`);
+                if (!stepIcon) continue;
+                
+                if (i < currentStep) {
+                    // Completed steps
+                    stepIcon.className = 'step-icon completed';
+                    stepIcon.textContent = '✓';
+                } else if (i === currentStep) {
+                    // Current step
+                    stepIcon.className = 'step-icon active';
+                    if (i === 5) {
+                        stepIcon.textContent = '✓';
+                    } else {
+                        stepIcon.textContent = i.toString();
+                    }
+                } else {
+                    // Pending steps
+                    stepIcon.className = 'step-icon pending';
+                    if (i === 5) {
+                        stepIcon.textContent = '✓';
+                    } else {
+                        stepIcon.textContent = i.toString();
+                    }
+                }
+            }
+            
+            // Update step 3 description with slide progress
+            if (stage === 'generating_slides' && details && details.current_slide) {
+                const step3Desc = document.getElementById('step3Description');
+                if (step3Desc) {
+                    step3Desc.textContent = `Generating slide ${details.current_slide} of ${details.total_slides}${details.slide_title ? ': ' + details.slide_title : ''}`;
+                }
+            } else if (stage === 'generating_slides') {
+                const step3Desc = document.getElementById('step3Description');
+                if (step3Desc) {
+                    step3Desc.textContent = 'Creating slide images';
+                }
+            }
+            
+            // Handle error state
+            if (stage === 'error') {
+                const currentStepIcon = document.getElementById(`stepIcon${currentStep}`);
+                if (currentStepIcon) {
+                    currentStepIcon.className = 'step-icon error';
+                }
             }
         }
         

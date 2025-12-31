@@ -59,8 +59,9 @@ if static_dir.exists():
 async def generate_slides(
     file: UploadFile = File(...),
     api_key: Optional[str] = Form(None),
+    model_image: Optional[str] = Form(None),
+    use_cache: Optional[str] = Form("true"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
-    use_cache: bool = True
 ):
     """
     Start slide generation workflow.
@@ -97,6 +98,17 @@ async def generate_slides(
     # Clean the API key
     api_key = api_key.strip()
     
+    # Parse use_cache (comes as string from form)
+    use_cache_bool = use_cache.lower() == "true" if use_cache else True
+    
+    # Validate model_image if provided
+    valid_models = ["gemini-2.5-flash-image", "gemini-3-pro-image-preview"]
+    if model_image and model_image not in valid_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid model_image. Must be one of: {', '.join(valid_models)}"
+        )
+    
     # Save uploaded file
     pdf_path = UPLOAD_DIR / f"{job_id}_{file.filename}"
     
@@ -125,8 +137,9 @@ async def generate_slides(
         pdf_path=pdf_path,
         output_dir=output_dir,
         status_manager=status_manager,
-        use_cache=use_cache,
-        api_key=api_key
+        use_cache=use_cache_bool,
+        api_key=api_key,
+        model_image=model_image
     )
     
     return JSONResponse({
@@ -284,6 +297,15 @@ async def get_file(job_id: str, filename: str):
         media_type=media_type,
         filename=filename
     )
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon"""
+    favicon_path = static_dir / "favicon.ico"
+    if favicon_path.exists():
+        return FileResponse(favicon_path, media_type="image/x-icon")
+    raise HTTPException(status_code=404, detail="Favicon not found")
 
 
 @app.get("/", response_class=HTMLResponse)
