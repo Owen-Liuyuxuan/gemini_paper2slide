@@ -255,7 +255,7 @@ The system can be configured via:
 - Check logs in `logs/` directory for detailed error messages
 
 **Slow generation:**
-- Image generation can take 30-60 seconds per slide
+- Image generation can take 60-90 seconds per slide
 - Use caching to speed up re-runs: `--use-cache` (default)
 - Resume from checkpoint if interrupted: `--resume`
 
@@ -281,43 +281,6 @@ paper2slide/
 ├── uv.lock                # Locked dependency versions (for uv)
 └── requirements.txt       # Python dependencies (legacy, use pyproject.toml)
 ```
-
-## Development with uv
-
-### Adding Dependencies
-
-To add a new dependency:
-```bash
-uv add package-name
-```
-
-To add a development dependency:
-```bash
-uv add --dev package-name
-```
-
-### Updating Dependencies
-
-To update all dependencies:
-```bash
-uv sync --upgrade
-```
-
-To update a specific package:
-```bash
-uv add package-name@latest
-```
-
-### Running Commands
-
-All Python commands should be run with `uv run`:
-```bash
-uv run python script.py
-uv run pytest
-uv run black .
-```
-
-This ensures the correct virtual environment and dependencies are used.
 
 ## Contributing
 
