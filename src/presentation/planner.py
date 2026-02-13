@@ -44,6 +44,7 @@ class PresentationPlanner:
         paper_analysis: PaperAnalysisSchema,
         pdf_path: Path,
         progress_callback: ProgressCallback | None = None,
+        user_prompt: str | None = None,
     ) -> PresentationPlan:
         """
         Create presentation plan based on paper analysis.
@@ -66,6 +67,7 @@ class PresentationPlanner:
         # Build comprehensive prompt for presentation planning
         prompt = self._build_presentation_plan_prompt(
             paper_analysis,
+            user_prompt=user_prompt,
         )
 
         if progress_callback:
@@ -147,6 +149,7 @@ class PresentationPlanner:
     def _build_presentation_plan_prompt(
         self,
         paper_analysis: PaperAnalysisSchema,
+        user_prompt: str | None = None,
     ) -> str:
         """
         Build comprehensive prompt for creating presentation plan.
@@ -164,6 +167,30 @@ class PresentationPlanner:
         # Load template from file
         template = self.gemini_client._load_prompt_template("presentation_plan")
 
+        # First format the template with paper analysis to avoid format collisions
         prompt = template.format(paper_analysis=paper_analysis)
 
+        # If user provided an extra prompt, insert it before the JSON schema anchor
+        # to inform the LLM of special requirements.
+        user_text = (user_prompt or '')
+
+        # Prefer to look for the anchor phrase marking the JSON schema
+        anchor = "Provide the plan in JSON format"
+        if user_text and user_text.strip():
+            insert_block = (
+                "\n\nTake full consideration of the user's special requirements when generating the presentation plan.\n\n"
+                "If the user's requirement go beyond simply reading the paper, you should align with them as best as possible.\n\n" 
+                "If the user's requirement include certain styles/tones/themes, ensure these are reflected in the plan of target slides.\n\n"
+                "If the user's requirement include contents updates, prioritize them or incorporate them where possible.\n\n"
+                "If the user's requirement include using your creativity or professional knowledge, feel free to enhance the presentation contents and plan accordingly.\n\n"
+                f"The Requirement from user: {user_text.strip()}\n"
+            )
+            idx = prompt.find(anchor)
+            if idx != -1:
+                prompt = prompt[:idx] + insert_block + prompt[idx:]
+            else:
+                prompt = prompt + "\n" + insert_block
+        print("===== Generated Presentation Plan Prompt =====")
+        print(prompt)
+        print("===============================================")
         return prompt

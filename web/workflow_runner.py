@@ -33,6 +33,7 @@ def run_generation_workflow(
     use_cache: bool = True,
     api_key: str | None = None,
     model_image: str | None = None,
+    user_prompt: str | None = None,
 ) -> None:
     """
     Run the complete slide generation workflow with progress reporting.
@@ -101,6 +102,7 @@ def run_generation_workflow(
             progress_callback=lambda stage, p, m, details=None: progress_callback(
                 ProgressStage.PLANNING, 30 + int(p * 0.1), m, details
             ),
+            user_prompt=(user_prompt or ""),
         )
         logger.info(f"[{job_id}] Created plan with {plan.total_slides} slides")
 

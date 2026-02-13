@@ -56,6 +56,7 @@ if static_dir.exists():
 async def generate_slides(
     file: UploadFile = File(...),
     api_key: str | None = Form(None),
+    user_prompt: str | None = Form(None),
     model_image: str | None = Form(None),
     use_cache: str | None = Form("true"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -131,6 +132,7 @@ async def generate_slides(
         use_cache=use_cache_bool,
         api_key=api_key,
         model_image=model_image,
+        user_prompt=(user_prompt or "").strip()[:10000],
     )
 
     return JSONResponse({"job_id": job_id, "status": "started", "message": "Generation started"})

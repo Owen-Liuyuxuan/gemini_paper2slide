@@ -512,6 +512,18 @@
             <input type="file" id="fileInput" accept=".pdf" />
         </div>
 
+        <div style="margin-top:16px;">
+            <label for="userPromptInput" style="display:block;margin-bottom:8px;font-weight:600;color:#333;">Optional: Extra instructions for the plan (multi-line)</label>
+            <textarea id="userPromptInput" rows="6" style="width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:6px;font-size:14px;font-family:inherit;resize:vertical;" placeholder="Add special requirements or preferences for the generated presentation plan..."></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                <div id="promptHint" style="font-size:12px;color:#666;">You can provide extra instructions for the planner. Leave empty to use defaults.</div>
+                <div style="display:flex;gap:12px;align-items:center;">
+                    <div id="charCount" style="font-size:12px;color:#333;">0/10000</div>
+                    <button class="save-button" id="startButton" onclick="startRun()" disabled>Enter</button>
+                </div>
+            </div>
+        </div>
+
         <div class="progress-container" id="progressContainer">
             <div class="steps-tracker">
                 <h3>Workflow Progress</h3>
@@ -679,20 +691,57 @@
             }
         });
 
+        // Selected file and UI elements for prompt
+        let selectedFile = null;
+        const userPromptInput = document.getElementById('userPromptInput');
+        const charCount = document.getElementById('charCount');
+        const startButton = document.getElementById('startButton');
+
+        // Update character count and color
+        function updateCharCount() {
+            const max = 10000;
+            const val = userPromptInput.value || '';
+            const count = val.length;
+            charCount.textContent = `${count}/${max}`;
+            if (count > max) {
+                charCount.style.color = '#c33';
+            } else if (count > max * 0.8) {
+                charCount.style.color = '#e67e22';
+            } else {
+                charCount.style.color = '#28a745';
+            }
+        }
+
+        userPromptInput.addEventListener('input', () => {
+            updateCharCount();
+        });
+
+        // Handle file selection (store file, enable start button)
         async function handleFile(file) {
             if (!file.name.endsWith('.pdf')) {
                 showError('Please upload a PDF file');
                 return;
             }
+            selectedFile = file;
+            document.getElementById('promptHint').textContent = `Selected file: ${file.name}. Enter optional prompt then click Enter.`;
+            startButton.disabled = false;
+            hideError();
+        }
 
-            // Check if API key is set
+        // Start run when user clicks Enter
+        async function startRun() {
+            if (!selectedFile) {
+                showError('Please select a PDF file first');
+                return;
+            }
+
+            // Check API key
             if (!savedApiKey) {
                 const apiKeyInput = document.getElementById('apiKeyInput');
                 if (!apiKeyInput.value.trim()) {
                     showError('Please enter your Google API key in the settings panel first');
                     return;
                 }
-                // Try to save it
                 saveApiKey();
                 if (!savedApiKey) {
                     showError('Please enter a valid API key');
@@ -700,7 +749,7 @@
                 }
             }
 
-            // Reset UI
+            // Prepare UI for upload
             hideError();
             hideSuccess();
             progressContainer.classList.add('active');
@@ -731,12 +780,25 @@
             localStorage.setItem('image_model', imageModel);
             localStorage.setItem('use_cache', useCache.toString());
 
-            // Upload file with API key and configuration
+            // Prepare user prompt (truncate to 10000 chars)
+            let userPrompt = (userPromptInput.value || '').toString();
+            if (!userPrompt.trim()) {
+                document.getElementById('promptHint').textContent = 'No custom prompt provided — running with default prompts.';
+            } else {
+                document.getElementById('promptHint').textContent = 'Custom prompt detected — passed to LLM.';
+            }
+            const maxLen = 10000;
+            if (userPrompt.length > maxLen) {
+                userPrompt = userPrompt.slice(0, maxLen);
+            }
+
+            // Upload file with API key and configuration and optional user_prompt
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', selectedFile);
             formData.append('api_key', savedApiKey);
             formData.append('model_image', imageModel);
             formData.append('use_cache', useCache.toString());
+            formData.append('user_prompt', userPrompt);
 
             try {
                 const response = await fetch('/api/generate-slides', {
